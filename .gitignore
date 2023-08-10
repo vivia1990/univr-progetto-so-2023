@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 
+# Linter
+compile_flags.txt
+
 # Object files
 *.o
 *.ko
