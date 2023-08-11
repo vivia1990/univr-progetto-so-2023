@@ -1,4 +1,4 @@
-#include <log.h>
+#include "server.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -6,7 +6,15 @@
 int
 main(int argc, char const *argv[])
 {
-    log_init(get_logger(), STDOUT_FILENO, STDERR_FILENO);
+    init_server(get_server());
 
+    print_server(get_server());
     return EXIT_SUCCESS;
+}
+
+struct Server *
+get_server()
+{
+    static struct Server server = {0};
+    return &server;
 }
