@@ -1,6 +1,8 @@
 #include "server.h"
+#include "connection_manager.h"
 #include <signal.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 int32_t
@@ -23,19 +25,22 @@ init_server(struct Server *server)
 int32_t
 down_server(struct Server *server)
 {
-    if (kill(server->connServicePid, SIGTERM) < 0) {
-        LOG_ERROR("Errore kill connService: %d", server->connServicePid);
-    }
+    conn_remove_manager(server);
     return 0;
 }
 
 void
 print_server(struct Server *server)
 {
-
+    const char *const lab = "\n+--------------------------------------+\n";
+    write(STDOUT_FILENO, lab, strlen(lab));
     LOG_INFO("Server", "");
-    printf("Pid: %d\nConnectionServicePid: %d\nConnectionQueueId: %d\nInGame: "
-           "%d\n IsListeningForConnection %d\n",
+    puts("----------------------------------------");
+    printf("\tPid: %d\n\tConnectionServicePid: %d\n\tConnectionQueueId: "
+           "%d\n\tInGame: "
+           "%d\n\tIsListeningForConnection %d\n",
            server->pid, server->connServicePid, server->connQueueId,
            server->inGame, server->isListneningForConnection);
+    puts("+--------------------------------------+\n");
+    fflush(stdout);
 }

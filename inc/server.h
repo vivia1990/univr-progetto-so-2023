@@ -2,6 +2,7 @@
 #define SERVER_H
 
 #include "log.h"
+#include "utils.h"
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
