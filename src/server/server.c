@@ -1,5 +1,5 @@
 #include "server.h"
-#include <stdint.h>
+#include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -23,6 +23,9 @@ init_server(struct Server *server)
 int32_t
 down_server(struct Server *server)
 {
+    if (kill(server->connServicePid, SIGTERM) < 0) {
+        LOG_ERROR("Errore kill connService: %d", server->connServicePid);
+    }
     return 0;
 }
 
@@ -32,7 +35,7 @@ print_server(struct Server *server)
 
     LOG_INFO("Server", "");
     printf("Pid: %d\nConnectionServicePid: %d\nConnectionQueueId: %d\nInGame: "
-           "%d\n",
+           "%d\n IsListeningForConnection %d\n",
            server->pid, server->connServicePid, server->connQueueId,
-           server->inGame);
+           server->inGame, server->isListneningForConnection);
 }

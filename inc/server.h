@@ -1,3 +1,6 @@
+#ifndef SERVER_H
+#define SERVER_H
+
 #include "log.h"
 #include <fcntl.h>
 #include <stdbool.h>
@@ -11,6 +14,7 @@ struct Server {
     struct Logger *logger;
     struct Client *players[2];
     _Bool inGame;
+    _Bool isListneningForConnection;
 };
 
 struct Client {
@@ -26,3 +30,5 @@ struct Server *get_server();
 int32_t init_server(struct Server *server);
 void print_server(struct Server *server);
 int32_t down_server(struct Server *server);
+
+#endif

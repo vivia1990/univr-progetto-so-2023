@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <errno.h>
 #include <log.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -49,8 +50,13 @@ print_log_message(enum LogType type, const char *format, ...)
     buff[wb + 1] = '\0';
 
     struct Logger *log = get_logger();
-    const int32_t fd =
-        type == error ? log->errorDescriptor : log->outDescriptor;
+    _Bool isError = type == error;
+    const int32_t fd = isError ? log->errorDescriptor : log->outDescriptor;
 
     write(fd, buff, wb + 1);
+    if (isError) {
+        const char *const err = strerror(errno);
+        const size_t length = strlen(err);
+        write(fd, err, length);
+    }
 }
