@@ -16,5 +16,7 @@
 
 char *int_to_string(int32_t value, char *buff, size_t length);
 ssize_t create_fifo(const char *path);
+ssize_t create_queue();
+ssize_t remove_queue(int32_t queueId);
 
 #endif
