@@ -1,3 +1,6 @@
+#ifndef LOG_H
+#define LOG_H
+
 #include <stdint.h>
 
 #define ANSI_COLOR_RED "\x1b[31m"
@@ -33,3 +36,5 @@ struct Logger *get_logger();
 int32_t log_init(struct Logger *log, uint32_t outDesc, uint32_t errDesc);
 
 void print_log_message(enum LogType type, const char *format, ...);
+
+#endif
