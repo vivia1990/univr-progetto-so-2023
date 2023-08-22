@@ -23,7 +23,7 @@
         print_log_message(error, format, args);                                \
     } while (0);
 
-enum LogType { info, error, log_type_length };
+enum LogType { info, error, test_passed, test_failed, log_type_length };
 
 struct Logger {
     int32_t outDescriptor;

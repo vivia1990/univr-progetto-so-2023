@@ -11,6 +11,8 @@
 static const char *const LogLabels[log_type_length] = {
     [info] = ANSI_COLOR_BLUE "info" ANSI_COLOR_RESET,
     [error] = ANSI_COLOR_RED "error" ANSI_COLOR_RESET,
+    [test_passed] = ANSI_COLOR_GREEN "test-passed" ANSI_COLOR_RESET,
+    [test_failed] = ANSI_COLOR_RED "test-failed" ANSI_COLOR_RESET,
 };
 
 struct Logger *
@@ -32,6 +34,8 @@ log_init(struct Logger *log, uint32_t outDesc, uint32_t errDesc)
 void
 print_log_message(enum LogType type, const char *format, ...)
 {
+    _Bool errorOcc = errno != 0;
+    const char *const err = strerror(errno);
     va_list args;
 
     char buff[LOG_BUFFER_SIZE];
@@ -54,8 +58,7 @@ print_log_message(enum LogType type, const char *format, ...)
     const int32_t fd = isError ? log->errorDescriptor : log->outDescriptor;
 
     write(fd, buff, wb + 1);
-    if (isError) {
-        const char *const err = strerror(errno);
+    if (isError && errorOcc) {
         const size_t length = strlen(err);
         write(fd, err, length);
     }
