@@ -1,5 +1,6 @@
 #include "server.h"
 #include "connection_manager.h"
+#include "game.h"
 #include "log.h"
 #include "utils.h"
 #include <signal.h>
@@ -10,7 +11,8 @@
 #include <unistd.h>
 
 int32_t
-init_server(struct Server *server)
+init_server(struct Server *server, struct GameSettings *gameSettings,
+            struct ServerArgs *args)
 {
     server->pid = getpid();
     server->inGame = false;
@@ -22,6 +24,8 @@ init_server(struct Server *server)
     }
 
     server->logger = logger;
+    game_init(gameSettings, args->rows, args->columns);
+    server->gameSettings = gameSettings;
 
     return 1;
 }
@@ -65,6 +69,8 @@ down_server(struct Server *server)
     close(server->connServicePipe[0]);
     close(server->connServicePipe[1]);
 
+    game_destruct(server->gameSettings);
+
     return 0;
 }
 
@@ -85,9 +91,9 @@ print_server(struct Server *server)
     for (size_t i = 0; i < server->playerCounter; i++) {
         struct Client *client = server->players[i];
         printf("\tPid: %d\n\tPlayerName: %s\n\tQueueId: "
-               "%d\n\tTimeoutCounter:  %d\n\twinner %d\n\n",
+               "%d\n\tTimeoutCounter:  %d\n\twinner %d\n\n\tsymbol %c\n\n",
                client->pid, client->playerName, client->queueId,
-               client->timeoutCounter, client->winner);
+               client->timeoutCounter, client->winner, client->symbol);
     }
     puts("+--------------------------------------+\n");
     fflush(stdout);
