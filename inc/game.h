@@ -23,9 +23,13 @@ struct GameField {
  * Inizializza il campo da gioco
  */
 int32_t game_init(struct GameSettings *game, size_t rows, size_t columns);
+
 int32_t game_check_win(struct GameField *field, struct Client *player);
+
 int32_t game_set_point(struct GameField *field, size_t column, char symbol);
+
 int32_t game_destruct(struct GameSettings *game);
+
 void print_game_field(struct GameSettings *game);
 
 #endif

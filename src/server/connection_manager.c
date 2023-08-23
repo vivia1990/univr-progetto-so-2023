@@ -19,34 +19,35 @@ conn_loop(struct Server *server)
 
     LOG_INFO("connection loop start", "")
 
-    int32_t playerCounter = 0;
-    struct ClientRequest req = {};
-    struct ServerResponse resp = {};
+    struct Payload pl = {0};
+    struct ServerConnectionResponse resp = {};
     const int32_t servConnQId = server->connQueueId;
-    const size_t sizeReq = sizeof(struct ClientRequest) - sizeof(int64_t);
-    const size_t sizeResp = sizeof(struct ServerResponse) - sizeof(int64_t);
+
+    int32_t playerCounter = 0;
     while (1) {
-        msgrcv(servConnQId, &req, sizeReq, MSG_CONNECTION, 0660);
-        const struct Client *client = create_client(&req);
+        msgrcv(servConnQId, &pl, MSG_SIZE(Payload), MSG_CONNECTION, 0660);
+        struct ClientConnectionRequest *req =
+            (struct ClientConnectionRequest *)pl.payload;
+
+        const struct Client *client = create_client(req);
         if (!client) {
             LOG_ERROR("Errore aggiunta client", "")
             continue;
         }
 
-        resp.mtype = req.typeResp;
+        pl.mtype = client->pid;
         resp.queueId = client->queueId;
-        msgsnd(req.typeResp, &resp, sizeResp, IPC_NOWAIT);
-        LOG_INFO("Giocatore %s connesso, qId; %d", client->playerName,
-                 client->queueId);
+
+        memcpy(pl.payload, &resp, sizeof(struct ServerConnectionResponse));
+        msgsnd(servConnQId, &pl, MSG_SIZE(Payload), IPC_NOWAIT);
+        LOG_INFO("Giocatore %s, PID: %d connesso, qId; %d", client->playerName,
+                 client->pid, client->queueId);
         write(server->connServicePipe[1], client, sizeof(struct Client));
         free((struct Client *)client);
 
         if (++playerCounter == 2) {
             playerCounter = 0;
-            // close(server->connServicePipe[1]);
-            errno = 0;
             assert(kill(getpid(), SIGSTOP) >= 0);
-            perror("\n");
         }
     }
 

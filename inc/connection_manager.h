@@ -1,3 +1,4 @@
+#include "messages.h"
 #include "server.h"
 #include "utils.h"
 #include <stdint.h>
@@ -26,4 +27,4 @@ int32_t conn_pause_listening(struct Server *server);
 /*
  * Crea una struttura di tipo client (malloc) dalla request di connessione
  */
-struct Client *create_client(struct ClientRequest *request);
+struct Client *create_client(struct ClientConnectionRequest *request);
