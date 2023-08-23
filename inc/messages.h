@@ -11,11 +11,6 @@
 
 #define MSG_SIZE(strct) (sizeof(struct strct) - sizeof(int64_t))
 
-struct Payload {
-    int64_t mtype;
-    char payload[256];
-};
-
 // MSG_CONNECTION
 struct ClientConnectionRequest {
     int32_t typeResp;

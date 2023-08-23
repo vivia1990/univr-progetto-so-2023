@@ -2,12 +2,15 @@
 #include "connection_manager.h"
 #include "game.h"
 #include "log.h"
+#include "messages.h"
 #include "utils.h"
 #include <signal.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/msg.h>
 #include <unistd.h>
 
 int32_t
@@ -16,6 +19,7 @@ init_server(struct Server *server, struct GameSettings *gameSettings,
 {
     server->pid = getpid();
     server->inGame = false;
+    server_init_signals();
 
     struct Logger *logger = get_logger();
     if (log_init(logger, STDOUT_FILENO, STDERR_FILENO) < 0) {
@@ -30,8 +34,14 @@ init_server(struct Server *server, struct GameSettings *gameSettings,
     return 1;
 }
 
+int32_t
+server_loop(struct Server *server)
+{
+    return 1;
+}
+
 struct Client *
-create_client(struct ClientRequest *request)
+create_client(struct ClientConnectionRequest *request)
 {
 
     struct Client *client = malloc(sizeof(struct Client));
@@ -52,7 +62,10 @@ create_client(struct ClientRequest *request)
 int32_t
 down_server(struct Server *server)
 {
-    conn_remove_manager(server);
+    if (conn_remove_manager(server) < 0) {
+        LOG_ERROR("Errore rimozione manager", "")
+    }
+
     for (size_t i = 0; i < server->playerCounter; i++) {
         struct Client *client = server->players[i];
         if (!client) {
@@ -97,4 +110,32 @@ print_server(struct Server *server)
     }
     puts("+--------------------------------------+\n");
     fflush(stdout);
+}
+
+void
+sig_int_handler()
+{
+    struct Server *server = get_server();
+    if (!server->wasCtrlCPressed) {
+        server->wasCtrlCPressed = true;
+    }
+    else {
+        LOG_INFO("CTRL-C premuto ripetutamente, terminazione Server", "")
+        down_server(server);
+        exit(EXIT_SUCCESS);
+    }
+}
+
+int32_t
+server_init_signals()
+{
+    sigset_t signals;
+    sigfillset(&signals);
+
+    sigdelset(&signals, SIGINT);
+    sigprocmask(SIG_SETMASK, &signals, NULL);
+
+    signal(SIGINT, sig_int_handler);
+
+    return 1;
 }

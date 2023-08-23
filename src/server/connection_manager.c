@@ -1,6 +1,7 @@
 #include "connection_manager.h"
 #include "log.h"
 #include "messages.h"
+#include "queue_api.h"
 #include "server.h"
 #include "utils.h"
 #include <errno.h>
@@ -9,6 +10,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/msg.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -19,29 +21,25 @@ conn_loop(struct Server *server)
 
     LOG_INFO("connection loop start", "")
 
-    struct Payload pl = {0};
+    struct ClientConnectionRequest req = {};
     struct ServerConnectionResponse resp = {};
     const int32_t servConnQId = server->connQueueId;
 
     int32_t playerCounter = 0;
     while (1) {
-        msgrcv(servConnQId, &pl, MSG_SIZE(Payload), MSG_CONNECTION, 0660);
-        struct ClientConnectionRequest *req =
-            (struct ClientConnectionRequest *)pl.payload;
+        queue_recive_connection(servConnQId, &req, sizeof req, MSG_CONNECTION);
 
-        const struct Client *client = create_client(req);
+        const struct Client *client = create_client(&req);
         if (!client) {
             LOG_ERROR("Errore aggiunta client", "")
             continue;
         }
 
-        pl.mtype = client->pid;
         resp.queueId = client->queueId;
-
-        memcpy(pl.payload, &resp, sizeof(struct ServerConnectionResponse));
-        msgsnd(servConnQId, &pl, MSG_SIZE(Payload), IPC_NOWAIT);
+        queue_send_connection(servConnQId, &resp, sizeof resp, req.clientPid);
         LOG_INFO("Giocatore %s, PID: %d connesso, qId; %d", client->playerName,
                  client->pid, client->queueId);
+
         write(server->connServicePipe[1], client, sizeof(struct Client));
         free((struct Client *)client);
 
@@ -65,6 +63,10 @@ conn_create_manager(struct Server *server)
 
     pid_t manager = fork();
     if (manager == 0) {
+        sigset_t signals;
+        sigfillset(&signals);
+        sigprocmask(SIG_SETMASK, &signals, NULL);
+
         assert(close(server->connServicePipe[0]) >= 0);
         kill(getpid(), SIGSTOP);
         conn_loop(server);
@@ -120,7 +122,7 @@ conn_remove_manager(struct Server *server)
         return status;
     }
 
-    status = kill(server->connServicePid, SIGTERM);
+    status = kill(server->connServicePid, SIGKILL);
     if (status < 0) {
         LOG_ERROR("Errore terminazione connection manager, pid: %d",
                   server->connServicePid)
