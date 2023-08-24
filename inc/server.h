@@ -50,6 +50,8 @@ int32_t init_server(struct Server *server, struct GameSettings *gameSettings,
 
 int32_t server_loop(struct Server *server);
 
+int32_t add_clients(struct Server *server, struct ServerArgs *args);
+
 int32_t down_server(struct Server *server);
 
 void print_server(struct Server *server);

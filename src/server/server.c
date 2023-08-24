@@ -87,6 +87,31 @@ down_server(struct Server *server)
     return 0;
 }
 
+int32_t
+add_clients(struct Server *server, struct ServerArgs *args)
+{
+    server->playerCounter = 0;
+    struct Client client = {};
+    const size_t size = sizeof client;
+    while (server->playerCounter < 2) {
+        ssize_t bt = read(server->connServicePipe[0], &client, size);
+        if (bt < 0) {
+            LOG_ERROR("Errore inizializzazione client, counter %ld",
+                      server->playerCounter);
+            continue;
+        }
+
+        assert(server->playerCounter < 2);
+        client.symbol = args->symbols[server->playerCounter];
+        server->players[server->playerCounter] =
+            memcpy(malloc(size), &client, size);
+
+        server->playerCounter++;
+    }
+
+    return 1;
+}
+
 void
 print_server(struct Server *server)
 {
