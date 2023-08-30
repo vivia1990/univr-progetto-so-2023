@@ -8,6 +8,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#define ERRNO_LAB (ANSI_COLOR_RED "ERRNO" ANSI_COLOR_RESET ": ")
+
 static const char *const LogLabels[log_type_length] = {
     [info] = ANSI_COLOR_BLUE "info" ANSI_COLOR_RESET,
     [error] = ANSI_COLOR_RED "error" ANSI_COLOR_RESET,
@@ -50,16 +52,28 @@ print_log_message(enum LogType type, const char *format, ...)
     assert(wb < LOG_BUFFER_SIZE && wb > 0);
 
     wb += labLength + 2;
+    assert(wb < LOG_BUFFER_SIZE);
     buff[wb] = '\n';
-    buff[wb + 1] = '\0';
+
+    wb++;
+    buff[wb] = '\0';
 
     struct Logger *log = get_logger();
     _Bool isError = type == error;
     const int32_t fd = isError ? log->errorDescriptor : log->outDescriptor;
 
-    write(fd, buff, wb + 1);
     if (isError && errorOcc) {
         const size_t length = strlen(err);
-        write(fd, err, length);
+        memcpy(buff + wb, ERRNO_LAB, sizeof ERRNO_LAB);
+        wb += sizeof ERRNO_LAB;
+        assert(wb < LOG_BUFFER_SIZE);
+        memcpy(buff + wb, err, length);
+        wb += length;
+        assert(wb < LOG_BUFFER_SIZE);
+        buff[wb] = '\n';
     }
+
+    wb++;
+    buff[wb] = '\n';
+    write(fd, buff, wb + 1);
 }

@@ -114,6 +114,10 @@ conn_remove_manager(struct Server *server)
 
     LOG_INFO("Rimozione manager...", "")
 
+    if (server->connServicePid == 0) {
+        return 1;
+    }
+
     ssize_t status = remove_queue(server->connQueueId);
     if (status < 0) {
         LOG_ERROR("Errore eliminazione connection queue, key: %d",
