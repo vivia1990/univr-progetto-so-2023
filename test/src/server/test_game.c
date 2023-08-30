@@ -152,6 +152,28 @@ test_game_set_point_3()
     return 1;
 }
 
+int32_t
+test_print_game_field()
+{
+
+    struct GameField gf = {};
+    struct GameSettings game = {.field = &gf};
+
+    game_init(&game, 5, 5);
+
+    for (size_t i = 0; i < game.field->rows; i++) {
+        for (size_t j = 0; j < game.field->columns; j++) {
+            game.field->matrix[i][j] = 'X';
+        }
+    }
+
+    print_game_field(&game);
+
+    game_destruct(&game);
+
+    return 1;
+};
+
 int
 main(int argc, char const *argv[])
 {
@@ -160,6 +182,14 @@ main(int argc, char const *argv[])
     test_game_set_point_1();
     test_game_set_point_2();
     test_game_set_point_3();
+    test_print_game_field();
 
     return EXIT_SUCCESS;
+}
+
+struct Server *
+get_server()
+{
+    static struct Server server = {0};
+    return &server;
 }

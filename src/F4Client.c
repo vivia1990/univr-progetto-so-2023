@@ -1,5 +1,6 @@
 #include "log.h"
 #include "messages.h"
+#include "queue_api.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -11,18 +12,16 @@
 int32_t
 connect(int32_t connQId, const char *playerName)
 {
-    struct ClientRequest req = {
-        .clientPid = getpid(), .typeResp = getpid(), .mtype = MSG_CONNECTION};
+    struct ClientConnectionRequest req = {.clientPid = getpid(),
+                                          .typeResp = getpid()};
 
-    memcpy(req.playerName, playerName, strlen(playerName));
-    const size_t sizeReq = sizeof(struct ClientRequest) - sizeof(int64_t);
-    msgsnd(connQId, &req, sizeReq, IPC_NOWAIT);
+    queue_send_connection(connQId, &req, sizeof req, MSG_CONNECTION);
 
-    struct ServerResponse resp = {};
-    const size_t sizeResp = sizeof(struct ServerResponse) - sizeof(int64_t);
-    msgrcv(connQId, &resp, sizeResp, req.clientPid, 0);
+    struct ServerConnectionResponse resp = {};
 
-    printf("Connesso %s, queueId: %d", playerName, resp.queueId);
+    queue_recive_connection(connQId, &resp, sizeof resp, req.clientPid);
+
+    LOG_INFO("Connesso %s, queueId: %d", playerName, resp.queueId);
 
     return 1;
 }

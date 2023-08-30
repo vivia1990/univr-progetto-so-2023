@@ -56,13 +56,22 @@ print_game_field(struct GameSettings *game)
 {
 
     LOG_INFO("Matrice di gioco\n", "")
+    const uint8_t offsetStart = 2;
+
+    printf("%*c", offsetStart, 0x20);
+    for (uint8_t i = 0; i < game->field->rows; i++) {
+        printf("%*d%*c", 3, i, -1, 0x20);
+    }
+    puts("\n");
 
     for (size_t i = 0; i < game->field->rows; i++) {
+        printf("%*ld", 2, i);
         for (size_t j = 0; j < game->field->columns; j++) {
-            printf("%c", game->field->matrix[i][j]);
+            printf("%*c%*c", 3, game->field->matrix[i][j], -1, 0x20);
         }
         putc('\n', stdout);
     }
+    putc('\n', stdout);
     fflush(stdout);
 }
 
@@ -82,4 +91,10 @@ game_set_point(struct GameField *field, size_t columnIndex, char symbol)
     field->matrix[currentRow - 1][columnIndex] = symbol;
 
     return field->rowsIndex[columnIndex] = currentRow - 1;
+}
+
+int32_t
+game_check_win(struct GameField *field, struct Client *player)
+{
+    return false;
 }
