@@ -17,9 +17,10 @@ queue_send(int32_t qId, const struct Payload *pl)
 
     if (status < 0) {
         LOG_ERROR("Errore invio payload queue_api", "");
+        return status;
     }
 
-    return status;
+    return pl->mtype;
 }
 
 static int32_t
@@ -33,19 +34,30 @@ queue_recive(int32_t qId, struct Payload *pl, uint32_t mType)
 
     if (status < 0) {
         LOG_ERROR("Errore invio payload queue_api", "");
+        return status;
     }
 
-    return status;
+    return pl->mtype;
 }
 
 int32_t
-queue_send_game(int32_t qId, const void *msg, size_t msgSize, _Bool start)
+queue_send_game(int32_t qId, const void *msg, size_t msgSize,
+                int32_t messageType)
 {
-    struct Payload pl = {};
-    pl.mtype = start ? MSG_GAME_START : MSG_GAME;
+    struct Payload pl = {.mtype = messageType};
     memcpy(pl.payload, msg, msgSize);
 
     return queue_send(qId, &pl);
+}
+
+int32_t
+queue_recive_game(int32_t qId, void *msg, size_t msgSize, int32_t messageType)
+{
+    struct Payload pl = {};
+    ssize_t status = queue_recive(qId, &pl, messageType);
+    memcpy(msg, pl.payload, msgSize);
+
+    return status;
 }
 
 int32_t
@@ -68,4 +80,14 @@ queue_recive_connection(int32_t qId, void *msg, size_t msgSize,
     memcpy(msg, pl.payload, msgSize);
 
     return status;
+}
+
+int32_t
+queue_send_error(int32_t qId, const void *msg, size_t msgSize)
+{
+    struct Payload pl = {};
+    pl.mtype = MSG_ERROR;
+    memcpy(pl.payload, msg, msgSize);
+
+    return queue_send(qId, &pl);
 }

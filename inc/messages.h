@@ -4,10 +4,12 @@
 #include <fcntl.h>
 #include <stdint.h>
 
-#define MSG_CONNECTION 100
-#define MSG_GAME 200
-#define MSG_GAME_START 220
 #define MSG_ERROR 50
+#define MSG_CONNECTION 100
+#define MSG_SERVER_ACK 180
+#define MSG_CLIENT_MOVE 190
+#define MSG_TURN_START 200
+#define MSG_GAME_START 220
 
 #define MSG_SIZE(strct) (sizeof(struct strct) - sizeof(int64_t))
 
@@ -28,12 +30,13 @@ struct ServerGameResponse {
     uint32_t row;    // row to update
     uint32_t column; // column to update
     _Bool winner;
+    _Bool draw;
     _Bool endGame;
 };
 
 // MSG_GAME MSG_GAME_START
 struct ClientGameRequest {
-    int32_t move;
+    int32_t move;       // indice colonna campo di gioco
     _Bool restartMatch; // after winning
 };
 

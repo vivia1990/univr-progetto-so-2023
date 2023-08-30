@@ -34,7 +34,7 @@ int32_t queue_recive_connection(int32_t qId, void *msg, size_t msgSize,
  * @param start start o meno
  */
 int32_t queue_send_game(int32_t qId, const void *msg, size_t msgSize,
-                        _Bool start);
+                        int32_t messageType);
 
 /**
  * Manda un messaggio di tipo game
@@ -43,6 +43,14 @@ int32_t queue_send_game(int32_t qId, const void *msg, size_t msgSize,
  * mtype
  * @param start start o meno
  */
-int32_t queue_recive_game(int32_t qId, void *msg, size_t msgSize);
+int32_t queue_recive_game(int32_t qId, void *msg, size_t msgSize,
+                          int32_t messageType);
+
+/**
+ * Manda un messaggio di tipo erro
+ * @param msgSize dimensione in byte della struttura senza contare il campo
+ * mtype
+ */
+int32_t queue_send_error(int32_t qId, const void *msg, size_t msgSize);
 
 #endif
