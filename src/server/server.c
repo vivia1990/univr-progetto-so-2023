@@ -51,6 +51,19 @@ update_state(struct Server *server, struct GameState *state,
     return 1;
 }
 
+static struct Client *
+get_connected_player(struct Server *server)
+{
+    for (size_t i = 0; i < server->playerCounter; i++) {
+        struct Client *client = server->players[i];
+        if (!client->disconnected) {
+            return client;
+        }
+    }
+
+    return NULL;
+}
+
 int32_t
 server_loop(struct Server *server)
 {
@@ -75,6 +88,37 @@ server_loop(struct Server *server)
             struct ClientGameRequest req = {};
             queue_recive_game(state.currentPlayer->queueId, &req, sizeof req,
                               MSG_CLIENT_MOVE);
+
+            if (server->disconnectionHappened) { // todo refactor si può usare
+                                                 // direttamente il counter?
+                LOG_INFO("Client Disconnesso", "")
+                struct Client *client = get_connected_player(server);
+                if (!client) {
+                    LOG_INFO("giocatori disconnesi, down server", "")
+                    down_server(server);
+                }
+
+                struct ServerGameResponse resp = {
+                    .endGame = true,
+                    .winner = true,
+                    .draw = false,
+                    .column = 0,
+                    .row = 0,
+                };
+                LOG_INFO("vittoria player: %s", client->playerName)
+
+                queue_send_game(client->queueId, &resp, sizeof resp,
+                                MSG_TURN_START);
+
+                if (server->disconnectionCounter == 2) {
+                    LOG_INFO("giocatori disconnesi, down server", "")
+                    down_server(server);
+                }
+
+                server->disconnectionHappened = false;
+                print_server(server);
+                continue;
+            }
 
             int32_t rowIndex = game_set_point(gameField, req.move,
                                               state.currentPlayer->symbol);
@@ -205,9 +249,11 @@ print_server(struct Server *server)
     puts("----------------------------------------");
     printf("\tPid: %d\n\tConnectionServicePid: %d\n\tConnectionQueueId: "
            "%d\n\tInGame: "
-           "%d\n\tIsListeningForConnection %d\n",
+           "%d\n\tIsListeningForConnection: %d\nDisconnectionHappened: "
+           "%d\nDisconnectionCounter: %d\n",
            server->pid, server->connServicePid, server->connQueueId,
-           server->inGame, server->isListneningForConnection);
+           server->inGame, server->isListneningForConnection,
+           server->disconnectionHappened, server->disconnectionCounter);
 
     puts("\nClients:");
     for (size_t i = 0; i < server->playerCounter; i++) {
@@ -219,32 +265,4 @@ print_server(struct Server *server)
     }
     puts("+--------------------------------------+\n");
     fflush(stdout);
-}
-
-void
-sig_int_handler()
-{
-    struct Server *server = get_server();
-    if (!server->wasCtrlCPressed) {
-        server->wasCtrlCPressed = true;
-    }
-    else {
-        LOG_INFO("CTRL-C premuto ripetutamente, terminazione Server", "")
-        down_server(server);
-        exit(EXIT_SUCCESS);
-    }
-}
-
-int32_t
-server_init_signals()
-{
-    sigset_t signals;
-    sigfillset(&signals);
-
-    sigdelset(&signals, SIGINT);
-    sigprocmask(SIG_SETMASK, &signals, NULL);
-
-    signal(SIGINT, sig_int_handler);
-
-    return 1;
 }

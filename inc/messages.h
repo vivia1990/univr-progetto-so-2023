@@ -23,6 +23,8 @@ struct ClientConnectionRequest {
 // MSG_CONNECTION
 struct ServerConnectionResponse {
     int32_t queueId;
+    int32_t disconnectionSignal; // SIGUSR1 SIGUSR2
+    pid_t serverPid;
 };
 
 // MSG_GAME MSG_GAME_START

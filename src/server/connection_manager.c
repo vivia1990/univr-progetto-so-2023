@@ -35,7 +35,9 @@ conn_loop(struct Server *server)
             continue;
         }
 
+        resp.serverPid = getppid();
         resp.queueId = client->queueId;
+        resp.disconnectionSignal = SIGUSR1 + 2 * playerCounter;
         queue_send_connection(servConnQId, &resp, sizeof resp, req.clientPid);
         LOG_INFO("Giocatore %s, PID: %d connesso, qId; %d", client->playerName,
                  client->pid, client->queueId);

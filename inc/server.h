@@ -26,9 +26,11 @@ struct Server {
     _Bool isListneningForConnection;
     _Bool wasCtrlCPressed; // verifica se prima del prossimo messaggio ctrl-c è
                            // stato premuto
-    int32_t connServicePipe[2];
+    _Bool disconnectionHappened;
+    uint32_t disconnectionCounter;
     struct Logger *logger;
     struct Client *players[2];
+    int32_t connServicePipe[2];
     struct GameSettings *gameSettings;
 };
 
@@ -38,6 +40,7 @@ struct Client {
     uint32_t timeoutCounter;
     char symbol;
     _Bool winner;
+    _Bool disconnected;
     char playerName[64];
 };
 
