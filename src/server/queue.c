@@ -2,7 +2,6 @@
 #include "messages.h"
 #include "queue_api.h"
 #include "server.h"
-#include <asm-generic/errno-base.h>
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
@@ -17,7 +16,10 @@ queue_recive(int32_t qId, struct Payload *pl, uint32_t mType)
         errno = 0;
         status = msgrcv(qId, pl, MSG_SIZE(Payload), mType, 0660);
 
-        if (errno == EINTR && server->disconnectionHappened) {
+        if (errno == EINTR &&
+            (server->disconnectionHappened || server->timeoutHappened)) {
+            LOG_INFO("%s, disconnection: %d\ntimeout: %d\n", __func__,
+                     server->disconnectionHappened, server->timeoutHappened)
             return status;
         }
     } while (errno == EINTR);

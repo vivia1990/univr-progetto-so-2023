@@ -86,8 +86,10 @@ server_loop(struct Server *server)
 
         while (1) {
             struct ClientGameRequest req = {};
+            alarm(SERVER_TIMEOUT_SECONDS);
             queue_recive_game(state.currentPlayer->queueId, &req, sizeof req,
                               MSG_CLIENT_MOVE);
+            alarm(0);
 
             if (server->disconnectionHappened) { // todo refactor si può usare
                                                  // direttamente il counter?
@@ -108,7 +110,7 @@ server_loop(struct Server *server)
                 LOG_INFO("vittoria player: %s", client->playerName)
 
                 queue_send_game(client->queueId, &resp, sizeof resp,
-                                MSG_TURN_START);
+                                MSG_GAME_END);
 
                 if (server->disconnectionCounter == 2) {
                     LOG_INFO("giocatori disconnesi, down server", "")
@@ -117,7 +119,43 @@ server_loop(struct Server *server)
 
                 server->disconnectionHappened = false;
                 print_server(server);
-                continue;
+
+                return -1;
+            }
+
+            if (server->timeoutHappened) {
+                server->timeoutHappened = false;
+                if (++state.currentPlayer->timeoutCounter > MAX_TIMEOUT_MATCH) {
+
+                    struct ServerGameResponse resp = {
+                        .endGame = true,
+                        .winner = false,
+                        .draw = false,
+                        .column = 0,
+                        .row = 0,
+                    };
+                    // multiple timeouts
+                    queue_send_game(state.currentPlayer->queueId, &resp,
+                                    sizeof resp, MSG_GAME_END);
+
+                    resp.winner = true;
+                    update_state(
+                        server, (struct GameState *)&state,
+                        &(struct GameState){
+                            .currentPlayer =
+                                server->players[!state.currentPlayerIndex],
+                            .currentPlayerIndex = !state.currentPlayerIndex,
+                        });
+
+                    queue_send_game(state.currentPlayer->queueId, &resp,
+                                    sizeof resp, MSG_GAME_END);
+
+                    return -1;
+                }
+                struct ErrorMsg error = {.errorCode = 408,
+                                         .errorMsg = "Timeout raggiunto"};
+                queue_send_error(state.currentPlayer->queueId, &error,
+                                 sizeof error);
             }
 
             int32_t rowIndex = game_set_point(gameField, req.move,
@@ -152,6 +190,8 @@ server_loop(struct Server *server)
             queue_send_game(state.currentPlayer->queueId, &resp, sizeof resp,
                             MSG_SERVER_ACK); // @todo maybe turn_end?
 
+            LOG_INFO("reset timeout player %s", state.currentPlayer->playerName)
+            state.currentPlayer->timeoutCounter = 0;
             update_state(
                 server, (struct GameState *)&state,
                 &(struct GameState){
