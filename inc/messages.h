@@ -6,6 +6,7 @@
 
 #define MSG_ERROR 50
 #define MSG_CONNECTION 100
+#define MSG_GAME_END 170
 #define MSG_SERVER_ACK 180
 #define MSG_CLIENT_MOVE 190
 #define MSG_TURN_START 200
@@ -23,6 +24,10 @@ struct ClientConnectionRequest {
 // MSG_CONNECTION
 struct ServerConnectionResponse {
     int32_t queueId;
+    int32_t disconnectionSignal; // SIGUSR1 SIGUSR2
+    int32_t fieldRows;
+    int32_t fieldColumns;
+    pid_t serverPid;
 };
 
 // MSG_GAME MSG_GAME_START

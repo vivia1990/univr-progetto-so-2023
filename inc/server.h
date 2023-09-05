@@ -10,6 +10,9 @@ typedef struct GameSettings GameSettings;
 #include <stdbool.h>
 #include <stdint.h>
 
+#define SERVER_TIMEOUT_SECONDS 10
+#define MAX_TIMEOUT_MATCH 3
+
 struct ServerArgs {
     int32_t rows;
     int32_t columns;
@@ -18,18 +21,26 @@ struct ServerArgs {
 
 struct Server {
     pid_t pid;
-    pid_t connServicePid;
-    int32_t connQueueId;
     int32_t playerCounter;
     uint32_t currentPlayer; // index
-    _Bool inGame;
-    _Bool isListneningForConnection;
-    _Bool wasCtrlCPressed; // verifica se prima del prossimo messaggio ctrl-c è
-                           // stato premuto
-    int32_t connServicePipe[2];
+    _Bool wasCtrlCPressed;  // verifica se prima del prossimo messaggio ctrl-c
+                            // è stato premuto
+    _Bool disconnectionHappened;
+    _Bool timeoutHappened;
+    uint32_t disconnectionCounter;
     struct Logger *logger;
     struct Client *players[2];
+    struct ConnectionManager *connMng;
     struct GameSettings *gameSettings;
+};
+
+struct ConnectionManager {
+    pid_t connServicePid;
+    int32_t connShm;
+    int32_t connQueueId;
+    int32_t connServicePipe[2];
+    _Bool inGame;
+    _Bool isListneningForConnection;
 };
 
 struct Client {
@@ -38,6 +49,7 @@ struct Client {
     uint32_t timeoutCounter;
     char symbol;
     _Bool winner;
+    _Bool disconnected;
     char playerName[64];
 };
 

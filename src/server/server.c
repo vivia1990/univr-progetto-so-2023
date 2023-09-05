@@ -19,7 +19,6 @@ init_server(struct Server *server, struct GameSettings *gameSettings,
             struct ServerArgs *args)
 {
     server->pid = getpid();
-    server->inGame = false;
     server_init_signals();
 
     struct Logger *logger = get_logger();
@@ -51,6 +50,19 @@ update_state(struct Server *server, struct GameState *state,
     return 1;
 }
 
+static struct Client *
+get_connected_player(struct Server *server)
+{
+    for (size_t i = 0; i < server->playerCounter; i++) {
+        struct Client *client = server->players[i];
+        if (!client->disconnected) {
+            return client;
+        }
+    }
+
+    return NULL;
+}
+
 int32_t
 server_loop(struct Server *server)
 {
@@ -73,8 +85,76 @@ server_loop(struct Server *server)
 
         while (1) {
             struct ClientGameRequest req = {};
+            LOG_INFO("Server receiving", "")
             queue_recive_game(state.currentPlayer->queueId, &req, sizeof req,
                               MSG_CLIENT_MOVE);
+
+            if (server->disconnectionHappened) { // todo refactor si può usare
+                                                 // direttamente il counter?
+                LOG_INFO("Client Disconnesso", "")
+                struct Client *client = get_connected_player(server);
+                if (!client) {
+                    LOG_INFO("giocatori disconnesi", "")
+                    return -1;
+                }
+
+                struct ServerGameResponse resp = {
+                    .endGame = true,
+                    .winner = true,
+                    .draw = false,
+                    .column = 0,
+                    .row = 0,
+                };
+                LOG_INFO("vittoria player: %s", client->playerName)
+
+                queue_send_game(client->queueId, &resp, sizeof resp,
+                                MSG_GAME_END);
+
+                if (server->disconnectionCounter == 2) {
+                    LOG_INFO("giocatori disconnesi", "")
+                    return -1;
+                }
+
+                server->disconnectionHappened = false;
+                print_server(server);
+
+                return -1;
+            }
+
+            if (server->timeoutHappened) {
+                server->timeoutHappened = false;
+                if (++state.currentPlayer->timeoutCounter > MAX_TIMEOUT_MATCH) {
+
+                    struct ServerGameResponse resp = {
+                        .endGame = true,
+                        .winner = false,
+                        .draw = false,
+                        .column = 0,
+                        .row = 0,
+                    };
+                    // multiple timeouts
+                    queue_send_game(state.currentPlayer->queueId, &resp,
+                                    sizeof resp, MSG_GAME_END);
+
+                    resp.winner = true;
+                    update_state(
+                        server, (struct GameState *)&state,
+                        &(struct GameState){
+                            .currentPlayer =
+                                server->players[!state.currentPlayerIndex],
+                            .currentPlayerIndex = !state.currentPlayerIndex,
+                        });
+
+                    queue_send_game(state.currentPlayer->queueId, &resp,
+                                    sizeof resp, MSG_GAME_END);
+                    game_destruct(server->gameSettings);
+                    return -1;
+                }
+                struct ErrorMsg error = {.errorCode = 408,
+                                         .errorMsg = "Timeout raggiunto"};
+                queue_send_error(state.currentPlayer->queueId, &error);
+                continue;
+            }
 
             int32_t rowIndex = game_set_point(gameField, req.move,
                                               state.currentPlayer->symbol);
@@ -82,8 +162,7 @@ server_loop(struct Server *server)
 
                 struct ErrorMsg error = {.errorCode = 400,
                                          .errorMsg = "Mossa invalida"};
-                queue_send_error(state.currentPlayer->queueId, &error,
-                                 sizeof error);
+                queue_send_error(state.currentPlayer->queueId, &error);
                 continue;
             }
 
@@ -108,6 +187,8 @@ server_loop(struct Server *server)
             queue_send_game(state.currentPlayer->queueId, &resp, sizeof resp,
                             MSG_SERVER_ACK); // @todo maybe turn_end?
 
+            LOG_INFO("reset timeout player %s", state.currentPlayer->playerName)
+            state.currentPlayer->timeoutCounter = 0;
             update_state(
                 server, (struct GameState *)&state,
                 &(struct GameState){
@@ -146,8 +227,10 @@ create_client(struct ClientConnectionRequest *request)
 int32_t
 down_server(struct Server *server)
 {
-    if (conn_remove_manager(server) < 0) {
-        LOG_ERROR("Errore rimozione manager", "")
+    if (server->connMng) {
+        if (conn_remove_manager(server->connMng) < 0) {
+            LOG_ERROR("Errore rimozione manager", "")
+        }
     }
 
     for (size_t i = 0; i < server->playerCounter; i++) {
@@ -163,9 +246,6 @@ down_server(struct Server *server)
         free(client);
     }
 
-    close(server->connServicePipe[0]);
-    close(server->connServicePipe[1]);
-
     game_destruct(server->gameSettings);
 
     return 0;
@@ -178,7 +258,7 @@ add_clients(struct Server *server, struct ServerArgs *args)
     struct Client client = {};
     const size_t size = sizeof client;
     while (server->playerCounter < 2) {
-        ssize_t bt = read(server->connServicePipe[0], &client, size);
+        ssize_t bt = read(server->connMng->connServicePipe[0], &client, size);
         if (bt < 0) {
             LOG_ERROR("Errore inizializzazione client, counter %ld",
                       server->playerCounter);
@@ -193,7 +273,13 @@ add_clients(struct Server *server, struct ServerArgs *args)
         server->playerCounter++;
     }
 
-    return 1;
+    return server->playerCounter;
+}
+
+static const char *
+get_bool_lab(_Bool var)
+{
+    return var ? "true" : "false";
 }
 
 void
@@ -201,50 +287,34 @@ print_server(struct Server *server)
 {
     const char *const lab = "\n+--------------------------------------+\n";
     write(STDOUT_FILENO, lab, strlen(lab));
+
     LOG_INFO("Server", "");
     puts("----------------------------------------");
-    printf("\tPid: %d\n\tConnectionServicePid: %d\n\tConnectionQueueId: "
-           "%d\n\tInGame: "
-           "%d\n\tIsListeningForConnection %d\n",
-           server->pid, server->connServicePid, server->connQueueId,
-           server->inGame, server->isListneningForConnection);
+    struct ConnectionManager *connMng = server->connMng;
+    printf("\tPid: %d\n\tDisconnectionHappened: "
+           "%d\n\tDisconnectionCounter: %d\n\tWasCTRLPressed: "
+           "%s\n\tPlayerCounter: %d\n",
+           server->pid, server->disconnectionHappened,
+           server->disconnectionCounter, get_bool_lab(server->wasCtrlCPressed),
+           server->playerCounter);
+
+    if (connMng) {
+        printf("\tConnectionServicePid: %d\n\tConnectionQueueId: "
+               "%d\n\tInGame: "
+               "%s\n\tIsListeningForConnection: %s\n",
+               connMng->connServicePid, connMng->connQueueId,
+               get_bool_lab(connMng->inGame),
+               get_bool_lab(connMng->isListneningForConnection));
+    }
 
     puts("\nClients:");
     for (size_t i = 0; i < server->playerCounter; i++) {
         struct Client *client = server->players[i];
         printf("\tPid: %d\n\tPlayerName: %s\n\tQueueId: "
-               "%d\n\tTimeoutCounter:  %d\n\twinner %d\n\n\tsymbol %c\n\n",
+               "%d\n\tTimeoutCounter:  %d\n\twinner %d\n\tsymbol %c\n\n",
                client->pid, client->playerName, client->queueId,
                client->timeoutCounter, client->winner, client->symbol);
     }
     puts("+--------------------------------------+\n");
     fflush(stdout);
-}
-
-void
-sig_int_handler()
-{
-    struct Server *server = get_server();
-    if (!server->wasCtrlCPressed) {
-        server->wasCtrlCPressed = true;
-    }
-    else {
-        LOG_INFO("CTRL-C premuto ripetutamente, terminazione Server", "")
-        down_server(server);
-        exit(EXIT_SUCCESS);
-    }
-}
-
-int32_t
-server_init_signals()
-{
-    sigset_t signals;
-    sigfillset(&signals);
-
-    sigdelset(&signals, SIGINT);
-    sigprocmask(SIG_SETMASK, &signals, NULL);
-
-    signal(SIGINT, sig_int_handler);
-
-    return 1;
 }
