@@ -17,23 +17,29 @@ main(int argc, char const *argv[])
     args.symbols[0] = 'O';
     args.symbols[1] = 'X';
 
-    struct GameField gf = {};
+    struct GameField gf = {0};
     struct GameSettings game = {.field = &gf};
 
     struct Server *server = get_server();
     init_server(server, &game, &args);
     LOG_INFO("Server started, pid: %d", server->pid);
 
-    conn_create_manager(server);
-    if (conn_resume_listening(server) < 0) {
+    conn_init_manager(server);
+    if (conn_resume_listening(server->connMng) < 0) {
         LOG_ERROR("Errore resume connection manager", "")
     }
 
     LOG_INFO("waiting for players.., connectionManagerPid: "
              "%d\nConnectionQueueId: %d",
-             server->connServicePid, server->connQueueId);
+             server->connMng->connServicePid, server->connMng->connQueueId);
 
-    add_clients(server, &args);
+    while (1) {
+        add_clients(server, &args);
+        server->connMng->inGame = true;
+        conn_resume_listening(server->connMng);
+
+        server_loop(server);
+    }
 
     LOG_INFO("player connected game starts in few seconds ", "");
 

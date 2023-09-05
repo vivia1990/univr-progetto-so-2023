@@ -21,21 +21,26 @@ struct ServerArgs {
 
 struct Server {
     pid_t pid;
-    pid_t connServicePid;
-    int32_t connQueueId;
     int32_t playerCounter;
     uint32_t currentPlayer; // index
-    _Bool inGame;
-    _Bool isListneningForConnection;
-    _Bool wasCtrlCPressed; // verifica se prima del prossimo messaggio ctrl-c è
-                           // stato premuto
+    _Bool wasCtrlCPressed;  // verifica se prima del prossimo messaggio ctrl-c
+                            // è stato premuto
     _Bool disconnectionHappened;
     _Bool timeoutHappened;
     uint32_t disconnectionCounter;
     struct Logger *logger;
     struct Client *players[2];
-    int32_t connServicePipe[2];
+    struct ConnectionManager *connMng;
     struct GameSettings *gameSettings;
+};
+
+struct ConnectionManager {
+    pid_t connServicePid;
+    int32_t connShm;
+    int32_t connQueueId;
+    int32_t connServicePipe[2];
+    _Bool inGame;
+    _Bool isListneningForConnection;
 };
 
 struct Client {
