@@ -6,7 +6,7 @@
 #include <string.h>
 #include <sys/msg.h>
 
-extern int32_t queue_recive(int32_t qId, struct Payload *pl, uint32_t mType);
+extern int32_t queue_recive(int32_t qId, struct Payload *pl, int32_t mType);
 
 static int32_t
 queue_send(int32_t qId, const struct Payload *pl)
@@ -68,11 +68,21 @@ queue_recive_connection(int32_t qId, void *msg, size_t msgSize,
 }
 
 int32_t
-queue_send_error(int32_t qId, const void *msg, size_t msgSize)
+queue_send_error(int32_t qId, const struct ErrorMsg *msg)
 {
     struct Payload pl = {};
     pl.mtype = MSG_ERROR;
-    memcpy(pl.payload, msg, msgSize);
+    memcpy(pl.payload, msg, sizeof(struct ErrorMsg));
 
     return queue_send(qId, &pl);
+}
+
+int32_t
+queue_recive_error(int32_t qId, struct ErrorMsg *msg)
+{
+    struct Payload pl = {};
+    ssize_t status = queue_recive(qId, &pl, MSG_ERROR);
+    memcpy(msg, pl.payload, sizeof(struct ErrorMsg));
+
+    return status;
 }
