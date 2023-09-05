@@ -32,6 +32,7 @@ sig_usr_handler(int32_t signal)
 static void
 sig_alarm_handler(int32_t signal)
 {
+    LOG_INFO("timeout happened", "")
     struct Server *server = get_server();
     server->timeoutHappened = true;
 }
