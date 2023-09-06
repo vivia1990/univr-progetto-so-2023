@@ -91,6 +91,8 @@ server_loop(struct Server *server)
         if (server->disconnectionHappened) { // todo refactor si può usare
                                              // direttamente il counter?
             LOG_INFO("Client Disconnesso", "")
+            game_reset(server->gameSettings);
+
             struct Client *client = get_connected_player(server);
             if (!client) {
                 LOG_INFO("giocatori disconnesi", "")
@@ -145,7 +147,9 @@ server_loop(struct Server *server)
 
                 queue_send_game(state.currentPlayer->queueId, &resp,
                                 sizeof resp, MSG_GAME_END);
-                game_destruct(server->gameSettings);
+
+                game_reset(server->gameSettings);
+
                 return -3;
             }
             struct ErrorMsg error = {.errorCode = 408,
@@ -168,6 +172,18 @@ server_loop(struct Server *server)
 
         if (++server->gameSettings->movesCounter == maxMoves) {
             LOG_INFO("pareggio, mosse: %u", maxMoves)
+            print_game_field(server->gameSettings);
+            game_reset(server->gameSettings);
+
+            struct ServerGameResponse drawEnd = {0};
+            drawEnd.draw = true;
+            drawEnd.endGame = true;
+            queue_send_game(state.currentPlayer->queueId, &drawEnd,
+                            sizeof drawEnd, MSG_GAME_END);
+
+            queue_send_game(server->players[!state.currentPlayerIndex]->queueId,
+                            &drawEnd, sizeof drawEnd, MSG_GAME_END);
+            return -4;
         }
 
         if (game_check_win(gameField, state.currentPlayer)) {
