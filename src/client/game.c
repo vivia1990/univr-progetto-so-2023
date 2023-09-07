@@ -24,14 +24,6 @@ game_init(struct GameSettings *game, size_t rows, size_t columns)
         memset(field->matrix[i], 0x20, columns);
     }
 
-    // un indice per colonna
-    field->rowsIndex = malloc(sizeof(uint32_t) * columns);
-    assert(field->rowsIndex != NULL);
-
-    for (size_t i = 0; i < columns; i++) {
-        field->rowsIndex[i] = rows;
-    }
-
     return 1;
 }
 
@@ -46,7 +38,6 @@ game_destruct(struct GameSettings *game)
     }
 
     free(field->matrix);
-    free(field->rowsIndex);
 
     return 1;
 }
@@ -78,19 +69,7 @@ print_game_field(struct GameSettings *game)
 int32_t
 game_set_point(struct GameField *field, size_t columnIndex, char symbol)
 {
-    if (columnIndex > field->columns - 1) {
-        LOG_ERROR("Errore indice colonna fuori range %ld", columnIndex)
-        return -1;
-    }
-
-    const uint32_t currentRow = field->rowsIndex[columnIndex];
-    if (currentRow == 0) {
-        return -1;
-    }
-
-    field->matrix[currentRow - 1][columnIndex] = symbol;
-
-    return field->rowsIndex[columnIndex] = currentRow - 1;
+    return true;
 }
 
 _Bool

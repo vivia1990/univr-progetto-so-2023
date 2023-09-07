@@ -18,6 +18,11 @@ TEST_SERVER_SOURCES := $(shell find $(TEST_SERVER_PATH)  -name "*.c")
 TEST_SERVER_OBJ := $(patsubst src/%, obj/%, $(patsubst %.c, %.o, $(TEST_SERVER_SOURCES)))
 TEST_SERVER_BIN := $(shell find $(TEST_SERVER_PATH) -type f -printf "%f\n" | awk '{print "test/bin/server/" $$0}' | sed -r 's/\.c//g')
 
+TEST_CLIENT_PATH :=test/src/client
+TEST_CLIENT_SOURCES := $(shell find $(TEST_CLIENT_PATH)  -name "*.c")
+TEST_CLIENT_OBJ := $(patsubst src/%, obj/%, $(patsubst %.c, %.o, $(TEST_CLIENT_SOURCES)))
+TEST_CLIENT_BIN := $(shell find $(TEST_CLIENT_PATH) -type f -printf "%f\n" | awk '{print "test/bin/client/" $$0}' | sed -r 's/\.c//g')
+
 .PHONY: all build_dirs install rmipcs build_test_dirs test/clean clean
 
 all: bin/F4Server bin/F4Client
@@ -48,11 +53,20 @@ clean:
 ### test makefile
 test/server: $(TEST_SERVER_BIN)
 
+### test makefile
+test/client: $(TEST_CLIENT_BIN)
+
 test/bin/server/%: test/obj/server/%.o $(SERVER_OBJ) $(UTILS_OBJ)
 	$(CC) $^ $(CFLAGS) -o $@
 
-test/obj/server/%.o: test/src/server/%.c
+test/bin/client/%: test/obj/client/%.o $(CLIENT_OBJ) $(UTILS_OBJ)
+	$(CC) $^ $(CFLAGS) -o $@
+
+test/obj/client/%.o: test/src/client/%.c
 	$(CC) -c $< $(CFLAGS) -o $@
+
+test/obj/server/%.o: test/src/server/%.c
+	$(CC) -c $< $(CFLAGS) -o $@	
 
 test/clean:
 	rm -rf test/bin/* test/obj/*

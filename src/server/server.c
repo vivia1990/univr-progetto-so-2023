@@ -172,7 +172,7 @@ server_loop(struct Server *server)
                 LOG_INFO("pareggio, mosse: %u", maxMoves)
             }
 
-            if (game_check_win(gameField, state.currentPlayer)) {
+            if (game_check_win(gameField, state.currentPlayer->symbol)) {
                 // handle win
             }
 
