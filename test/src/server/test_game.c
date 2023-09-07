@@ -186,10 +186,3 @@ main(int argc, char const *argv[])
 
     return EXIT_SUCCESS;
 }
-
-struct Server *
-get_server()
-{
-    static struct Server server = {0};
-    return &server;
-}
