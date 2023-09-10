@@ -36,6 +36,76 @@ connect_to_server(struct ClientArgs *args, struct Client *client)
 
     return 1;
 }
+int32_t
+init_render_string(struct RenderString *obj)
+{
+    obj->renderData = calloc(1024, 1);
+    obj->size = 1024;
+    obj->length = 0;
+
+    return 1;
+}
+
+int32_t
+client_render(struct Client *client, struct RenderString *rString)
+{
+    size_t totalBytesW = 0;
+    char *outString = rString->renderData;
+    struct GameField *field = client->gameSettings->field;
+    const char *const padStr = "-----+";
+    const size_t sizePadStr = strlen(padStr);
+
+    totalBytesW +=
+        snprintf(outString + totalBytesW, rString->size, "%*c", 5, 0x20);
+
+    for (uint8_t i = 0; i < field->columns; i++) {
+        totalBytesW += snprintf(outString + totalBytesW, rString->size,
+                                "%*d%*c", 4, i + 1, 2, 0x20);
+    }
+    outString[totalBytesW++] = '\n';
+
+    totalBytesW +=
+        snprintf(outString + totalBytesW, rString->size, "%*c", 5, 0x20);
+
+    outString[totalBytesW++] = '*';
+    for (size_t i = 0; i < field->columns; i++) {
+        memcpy((outString + totalBytesW) + (i * sizePadStr), padStr,
+               sizePadStr);
+    }
+    totalBytesW += field->columns * (sizePadStr);
+    outString[totalBytesW - 1] = '*';
+    outString[totalBytesW++] = '\n';
+
+    for (size_t i = 0; i < field->rows; i++) {
+        totalBytesW += snprintf(outString + totalBytesW, rString->size,
+                                "%*ld%*c", 3, i + 1, 2, 0x20);
+        for (size_t j = 0; j < field->columns; j++) {
+            totalBytesW +=
+                snprintf(outString + totalBytesW, rString->size, "|%*c%*c", 3,
+                         field->matrix[i][j], -2, 0x20);
+        }
+        outString[totalBytesW++] = '|';
+        outString[totalBytesW++] = '\n';
+
+        totalBytesW +=
+            snprintf(outString + totalBytesW, rString->size, "%*c", 5, 0x20);
+        outString[totalBytesW++] = '|';
+        for (size_t i = 0; i < field->columns; i++) {
+            memcpy((outString + totalBytesW) + (i * sizePadStr), padStr,
+                   sizePadStr);
+        }
+        totalBytesW += field->columns * (sizePadStr);
+
+        outString[totalBytesW++] = '\n';
+    }
+    outString[totalBytesW - 2] = '*';
+    outString[totalBytesW - (field->columns * (sizePadStr)) - 2] = '*';
+
+    rString->length += totalBytesW - rString->length;
+
+    return rString->length;
+}
+
 
 int32_t
 init_client(struct Client *client, const struct ClientArgs *args)
