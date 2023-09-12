@@ -1,5 +1,6 @@
 #include "assert.h"
 #include "game.h"
+#include "server.h"
 #include "test.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -185,4 +186,11 @@ main(int argc, char const *argv[])
     test_print_game_field();
 
     return EXIT_SUCCESS;
+}
+
+struct Server *
+get_server()
+{
+    static struct Server server = {0};
+    return &server;
 }

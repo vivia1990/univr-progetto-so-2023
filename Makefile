@@ -51,6 +51,8 @@ clean:
 	make build_dirs
 
 ### test makefile
+test/all: test/server test/client
+
 test/server: $(TEST_SERVER_BIN)
 
 ### test makefile

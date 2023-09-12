@@ -19,4 +19,13 @@ ssize_t create_fifo(const char *path);
 ssize_t create_queue();
 ssize_t remove_queue(int32_t queueId);
 
+/**
+ * ANSI escape sequence to clear most of linux terminals
+ */
+void clear_terminal();
+
+int32_t stop_file_block(int32_t fileDesc);
+
+int32_t resume_file_block(int32_t fileDesc);
+
 #endif

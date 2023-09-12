@@ -2,6 +2,9 @@
 #include "game.h"
 #include "log.h"
 #include "test.h"
+#include "utils.h"
+
+#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -44,12 +47,6 @@ test_init_client()
     return 1;
 }
 
-void
-clearLine()
-{
-    printf("\033[H\033[J");
-}
-
 int32_t
 test_client_render()
 {
@@ -80,27 +77,29 @@ test_client_render()
     init_render_string(&rString);
     field.matrix[field.rows - 1][4] = 'X';
     field.matrix[field.rows - 1][3] = 'O';
-    clearLine();
-    size_t bytetW = client_render(client, &rString);
+    clear_terminal();
+    size_t bytetW = client_render(client, &rString, NULL, 0);
     printf("bt_written: %ld, strlen: %ld\n\n%s", bytetW,
            strlen(rString.renderData), rString.renderData);
 
     field.matrix[field.rows - 1][2] = 'X';
     field.matrix[field.rows - 1][1] = 'O';
-    bytetW = client_render(client, &rString);
+    bytetW = client_render(client, &rString, NULL, 0);
     sleep(4);
-    clearLine();
+    clear_terminal();
     printf("bt_written: %ld, strlen: %ld\n\n%s", bytetW,
            strlen(rString.renderData), rString.renderData);
 
     field.matrix[field.rows - 1][0] = 'X';
     field.matrix[field.rows - 1][6] = 'O';
-    bytetW = client_render(client, &rString);
+
+    const char *const askMsg = "==> È il tuo turno\n==> Scegli una colonna: ";
+    bytetW = client_render(client, &rString, (const char *[1]){askMsg}, 1);
     sleep(4);
-    clearLine();
+    clear_terminal();
     printf("bt_written: %ld, strlen: %ld\n\n%s", bytetW,
            strlen(rString.renderData), rString.renderData);
-
+    fflush(stdout);
     assert(strlen(rString.renderData) == bytetW);
 
     free(rString.renderData);
@@ -112,10 +111,28 @@ test_client_render()
     return EXIT_SUCCESS;
 }
 
+int32_t
+test_client_get_move()
+{
+    const char *const name = "mich";
+    struct ClientArgs args = {
+        .connQueueId = 1,
+        .isBot = false,
+        .playerName = name,
+    };
+    struct Client *client = get_client();
+
+    init_client(client, &args);
+    client_get_move(7, client);
+
+    return 1;
+}
+
 int
 main(int argc, char const *argv[])
 {
     test_client_render();
+    // test_client_get_move();
     return EXIT_SUCCESS;
 }
 
