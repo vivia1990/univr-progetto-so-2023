@@ -15,10 +15,10 @@ queue_recive(int32_t qId, struct Payload *pl, int32_t mType)
     struct Server *server = get_server();
     do {
         errno = 0;
-        LOG_INFO("errno %d, disconnection: %d\ntimeout: %d\n", errno,
-                 server->disconnectionHappened, server->timeoutHappened)
         alarm(SERVER_TIMEOUT_SECONDS);
         status = msgrcv(qId, pl, MSG_SIZE(Payload), mType, 0660);
+        LOG_INFO("errno %d, disconnection: %d\ntimeout: %d\n", errno,
+                 server->disconnectionHappened, server->timeoutHappened)
         if (errno == EINTR &&
             (server->disconnectionHappened || server->timeoutHappened)) {
             return status;

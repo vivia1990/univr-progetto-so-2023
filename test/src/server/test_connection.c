@@ -35,7 +35,7 @@ test_connection_server()
 
     struct Server *server = get_server();
     init_server(server, &game, &args);
-    conn_init_manager(server);
+    conn_init_manager(server, &args);
     print_server(server);
 
     if (conn_resume_listening(server->connMng) < 0) {
@@ -79,6 +79,12 @@ test_connection_server()
 
             LOG_INFO("Connesso queueId: %d, serverPid: %d", resp.queueId,
                      resp.serverPid);
+            assert(resp.opponentSymbol != resp.symbol);
+            assert(resp.fieldRows == args.rows);
+            assert(resp.fieldColumns == args.columns);
+
+            server->connMng->inGame = true;
+            conn_resume_listening(server->connMng);
         }
         exit(EXIT_SUCCESS);
     }

@@ -1,9 +1,7 @@
 #ifndef GAME_H
 #define GAME_H
 
-typedef struct Client Client;
-
-#include "server.h"
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -24,7 +22,7 @@ struct GameField {
  */
 int32_t game_init(struct GameSettings *game, size_t rows, size_t columns);
 
-int32_t game_check_win(struct GameField *field, struct Client *player);
+_Bool game_check_win(struct GameField *field, char symbol);
 
 int32_t game_set_point(struct GameField *field, size_t columnIndex,
                        char symbol);

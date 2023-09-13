@@ -7,7 +7,7 @@
 #include <sys/msg.h>
 
 int32_t
-queue_recive(int32_t qId, struct Payload *pl, uint32_t mType)
+queue_recive(int32_t qId, struct Payload *pl, int32_t mType)
 {
     ssize_t status = 0;
     do {

@@ -1,5 +1,6 @@
 #include "assert.h"
 #include "game.h"
+#include "server.h"
 #include "test.h"
 #include <stddef.h>
 #include <stdint.h>

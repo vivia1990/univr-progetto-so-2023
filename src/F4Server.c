@@ -24,7 +24,7 @@ main(int argc, char const *argv[])
     init_server(server, &game, &args);
     LOG_INFO("Server started, pid: %d", server->pid);
 
-    conn_init_manager(server);
+    conn_init_manager(server, &args);
     if (conn_resume_listening(server->connMng) < 0) {
         LOG_ERROR("Errore resume connection manager", "")
     }
@@ -33,15 +33,12 @@ main(int argc, char const *argv[])
              "%d\nConnectionQueueId: %d",
              server->connMng->connServicePid, server->connMng->connQueueId);
 
-    while (1) {
-        add_clients(server, &args);
-        server->connMng->inGame = true;
-        conn_resume_listening(server->connMng);
-
-        server_loop(server);
-    }
-
+    add_clients(server, &args);
     LOG_INFO("player connected game starts in few seconds ", "");
+    server->connMng->inGame = true;
+    conn_resume_listening(server->connMng);
+
+    server_loop(server);
 
     // log players;
 

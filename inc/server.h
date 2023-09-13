@@ -10,7 +10,7 @@ typedef struct GameSettings GameSettings;
 #include <stdbool.h>
 #include <stdint.h>
 
-#define SERVER_TIMEOUT_SECONDS 10
+#define SERVER_TIMEOUT_SECONDS 100
 #define MAX_TIMEOUT_MATCH 3
 
 struct ServerArgs {
@@ -39,6 +39,7 @@ struct ConnectionManager {
     int32_t connShm;
     int32_t connQueueId;
     int32_t connServicePipe[2];
+    char symbols[2];
     _Bool inGame;
     _Bool isListneningForConnection;
 };

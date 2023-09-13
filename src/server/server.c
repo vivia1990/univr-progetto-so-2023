@@ -85,14 +85,12 @@ server_loop(struct Server *server)
     while (1) {
         struct ClientGameRequest req = {};
         LOG_INFO("Server receiving", "")
-        queue_recive_game(state.currentPlayer->queueId, &req, sizeof req,
-                          MSG_CLIENT_MOVE);
-
+        int32_t mtype = queue_recive_game(state.currentPlayer->queueId, &req,
+                                          sizeof req, MSG_CLIENT_MOVE);
+        LOG_INFO("Received: %d", mtype)
         if (server->disconnectionHappened) { // todo refactor si può usare
                                              // direttamente il counter?
             LOG_INFO("Client Disconnesso", "")
-            game_reset(server->gameSettings);
-
             struct Client *client = get_connected_player(server);
             if (!client) {
                 LOG_INFO("giocatori disconnesi", "")
@@ -186,7 +184,7 @@ server_loop(struct Server *server)
             return -4;
         }
 
-        if (game_check_win(gameField, state.currentPlayer)) {
+        if (game_check_win(gameField, state.currentPlayer->symbol)) {
             // handle win
         }
 
@@ -219,7 +217,7 @@ server_loop(struct Server *server)
 }
 
 struct Client *
-create_client(struct ClientConnectionRequest *request)
+create_client(struct ClientConnectionRequest *request, char symbol)
 {
 
     struct Client *client = malloc(sizeof(struct Client));
@@ -227,6 +225,7 @@ create_client(struct ClientConnectionRequest *request)
     strcpy(client->playerName, request->playerName);
     client->timeoutCounter = 0;
     client->winner = false;
+    client->symbol = symbol;
 
     ssize_t qId = create_queue();
     if (qId == -1) {

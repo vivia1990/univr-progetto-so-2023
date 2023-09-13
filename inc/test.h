@@ -1,4 +1,5 @@
 #include "log.h"
+#include <assert.h>
 #include <unistd.h>
 
 #define TEST_PASSED(format, args...)                                           \
