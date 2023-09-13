@@ -5,6 +5,7 @@
 #include "queue_api.h"
 #include "server.h"
 #include "test.h"
+#include <assert.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdint.h>
@@ -79,20 +80,26 @@ test_connection_server()
             LOG_INFO("Connesso queueId: %d, serverPid: %d", resp.queueId,
                      resp.serverPid);
         }
-        {
-            struct ClientConnectionRequest req = {.clientPid = 3,
-                                                  .typeResp = 3};
-
-            memcpy(req.playerName, "mich", sizeof "mich");
-            queue_send_connection(connQId, &req, sizeof req, MSG_CONNECTION);
-
-            struct ErrorMsg err = {};
-            queue_recive_error(connQId, &err);
-        }
         exit(EXIT_SUCCESS);
     }
     wait(NULL);
     assert(add_clients(server, &args) == 2);
+    server->connMng->inGame = true;
+    conn_resume_listening(server->connMng);
+
+    {
+        int32_t connQId = server->connMng->connQueueId;
+        struct ClientConnectionRequest req = {.clientPid = 3, .typeResp = 3};
+
+        memcpy(req.playerName, "mich", sizeof "mich");
+        queue_send_connection(connQId, &req, sizeof req, MSG_CONNECTION);
+
+        struct ErrorMsg err = {};
+        queue_recive_error(connQId, &err);
+        assert(err.errorCode == 503);
+        assert(strcmp(err.errorMsg, "Partita in corso, riprovare più tardi") ==
+               0);
+    }
 
     down_server(server);
 
