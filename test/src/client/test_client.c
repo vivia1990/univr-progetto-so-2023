@@ -65,6 +65,7 @@ test_client_render()
     client->gameSettings = &settings;
 
     client->symbol = 'X';
+    client->opponentSymbol = 'O';
     client->queueId = 1;
     client->serverPid = 1;
     client->signalDisconnection = 10;
@@ -122,8 +123,34 @@ test_client_get_move()
     };
     struct Client *client = get_client();
 
+    const char *const msg =
+        "        1     2     3     4     5     6     7\n     "
+        "*-----+-----+-----+-----+-----+-----+-----*\n  1  |     |     |     | "
+        "    |     |     |     |\n     "
+        "|-----+-----+-----+-----+-----+-----+-----+\n  2  |     |     |     | "
+        "    |     |     |     |\n     "
+        "|-----+-----+-----+-----+-----+-----+-----+\n  3  |     |     |     | "
+        "    |     |     |     |\n     "
+        "|-----+-----+-----+-----+-----+-----+-----+\n  4  |     |     |     | "
+        "    |     |     |     |\n     "
+        "|-----+-----+-----+-----+-----+-----+-----+\n  5  |  X  |  O  |  X  | "
+        " O  |  X  |     |  O  |\n     "
+        "*-----+-----+-----+-----+-----+-----+-----*\n==> È il tuo turno\n==> "
+        "Scegli una colonna: ";
+
     init_client(client, &args);
-    client_get_move(7, client);
+    const char *const errorMsg = "==> Mossa precedente non valida!\n";
+    write(STDOUT_FILENO, msg, strlen(msg));
+    int32_t move = 0; // rand() % state->columns;
+    while (move <= 0) {
+        move = client_get_move(7, client);
+        if (move == -1) {
+            clear_terminal();
+            write(STDOUT_FILENO, errorMsg, strlen(errorMsg));
+            write(STDOUT_FILENO, msg, strlen(msg));
+            continue;
+        }
+    }
 
     return 1;
 }
@@ -131,8 +158,8 @@ test_client_get_move()
 int
 main(int argc, char const *argv[])
 {
-    test_client_render();
-    // test_client_get_move();
+    // test_client_render();
+    test_client_get_move();
     return EXIT_SUCCESS;
 }
 

@@ -9,7 +9,7 @@
 void
 clear_terminal()
 {
-    printf("\033[H\033[J");
+    write(STDOUT_FILENO, "\033[H\033[J", sizeof("\033[H\033[J") - 1);
 }
 
 char *

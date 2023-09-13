@@ -50,7 +50,7 @@ print_game_field(struct GameSettings *game)
     const uint8_t offsetStart = 2;
 
     printf("%*c", offsetStart, 0x20);
-    for (uint8_t i = 0; i < game->field->rows; i++) {
+    for (uint8_t i = 0; i < game->field->columns; i++) {
         printf("%*d%*c", 3, i, -1, 0x20);
     }
     puts("\n");

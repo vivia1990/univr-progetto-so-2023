@@ -21,6 +21,11 @@ struct State {
     struct GameField *field;
     uint8_t columns;
 };
+static int32_t process_error(struct Payload *pl, struct State *state,
+                             char *buffer);
+static int32_t process_game_end(struct Payload *pl, struct State *state);
+static int32_t process_turn_start(struct Payload *pl, struct State *state);
+static int32_t process_turn_end(struct Payload *pl, struct State *state);
 
 extern int32_t queue_recive(int32_t qId, struct Payload *pl, int32_t mType);
 
@@ -54,32 +59,34 @@ connect_to_server(struct ClientArgs *args, struct Client *client)
 }
 
 static int32_t
-process_error(struct Payload *pl, struct State *state)
+process_error(struct Payload *pl, struct State *state, char *buffer)
 {
     struct ErrorMsg errorMsg = {};
-    memcpy(&errorMsg, pl, sizeof errorMsg);
+    memcpy(&errorMsg, pl->payload, sizeof errorMsg);
+    const char *const msgPrefix = "==> ";
 
-    LOG_ERROR("ErrorCode %d, message: %s", errorMsg.errorCode,
-              errorMsg.errorMsg)
-    strcpy(state->string->renderData, errorMsg.errorMsg);
+    const size_t size = strlen(msgPrefix);
+    size_t length = size + strlen(errorMsg.errorMsg);
+    memcpy(buffer, msgPrefix, size);
+    strcpy(buffer + size, errorMsg.errorMsg);
+    buffer[length++] = '\n';
+    buffer[length++] = '\n';
 
-    return 1;
+    write(STDOUT_FILENO, buffer, length);
+
+    return process_turn_start(pl, state);
 }
 
 static int32_t
 process_game_end(struct Payload *pl, struct State *state)
 {
+    LOG_INFO("game end", "")
     return 1;
 }
 
 int32_t
 client_get_move(int32_t maxColumns, struct Client *client)
 {
-    const char *const askMsg =
-        "==> È il tuo turno\n==> Scegli una colonna e premi invio: ";
-    const size_t size = strlen(askMsg);
-
-    write(STDOUT_FILENO, askMsg, size);
     char number[4] = {0};
 
     int32_t move = 0;
@@ -87,23 +94,20 @@ client_get_move(int32_t maxColumns, struct Client *client)
         errno = 0;
         read(STDIN_FILENO, number, 3);
         if (client->timeoutHappened) {
-            move = -1;
             LOG_ERROR("Ci hai impiegato troppo tempo", "");
             client->timeoutHappened = false;
 
             resume_file_block(STDIN_FILENO);
-            break;
+
+            return -2;
         }
 
         number[3] = '\0';
 
         move = atoi(number);
-        if ((number[0] != '0' && move == 0) || move > maxColumns) {
-            LOG_ERROR("Inserito un numero di colonna non valido %s. Riprovare",
-                      number);
-            write(STDOUT_FILENO, askMsg, size);
+        if (move <= 0 || move > maxColumns) {
             memset(number, 0, 4);
-            continue;
+            return -1;
         }
 
         break;
@@ -111,6 +115,14 @@ client_get_move(int32_t maxColumns, struct Client *client)
 
     return move;
 }
+
+const char *const messages[] = {
+    "==> Congratulazioni, hai vinto!",
+    "==> Sconfitta :(",
+    "==> Gioco terminato, Pareggio",
+    "==> Mossa precedente non valida!\n\n",
+    "==> Attesa mossa altro giocatore...",
+};
 
 static int32_t
 process_turn_start(struct Payload *pl, struct State *state)
@@ -126,30 +138,62 @@ process_turn_start(struct Payload *pl, struct State *state)
     ssize_t bytes = client_render(state->client, state->string,
                                   (const char *[1]){askMsg}, 1);
 
-    write(STDOUT_FILENO, state->string, bytes);
-
-    int32_t move = client_get_move(state->columns, state->client);
-    if (move == -1) {
-        // todo timeout
+    write(STDOUT_FILENO, state->string->renderData, bytes);
+    int32_t move = 0; // rand() % state->columns;
+    while (move <= 0) {
+        move = client_get_move(state->columns, state->client);
+        if (move == -1) {
+            clear_terminal();
+            write(STDOUT_FILENO, messages[3], strlen(messages[3]));
+            write(STDOUT_FILENO, state->string->renderData, bytes);
+            continue;
+        }
     }
 
-    struct ClientGameRequest req = {.move = move, .restartMatch = false};
+    struct ClientGameRequest req = {.move = move - 1, .restartMatch = false};
     queue_send_game(state->client->queueId, &req, sizeof req, MSG_CLIENT_MOVE);
 
-    return 1;
+    return bytes - strlen(askMsg);
 }
 
 static int32_t
 process_turn_end(struct Payload *pl, struct State *state)
 {
-    return 1;
+    struct ServerGameResponse resp = {};
+    memcpy(&resp, pl->payload, sizeof resp);
+
+    state->field->matrix[resp.row][resp.column] = state->client->symbol;
+    if (resp.winner) {
+        size_t bytes = client_render(state->client, state->string,
+                                     (const char *[1]){messages[0]}, 1);
+        // todo ask rematch
+
+        struct ClientGameRequest req = {.move = 0, .restartMatch = false};
+        queue_send_game(state->client->queueId, &resp, sizeof resp,
+                        MSG_CLIENT_MOVE); // todo nuovo tipo?
+
+        return bytes;
+    }
+
+    if (resp.draw) {
+        return client_render(state->client, state->string,
+                             (const char *[1]){messages[2]}, 1);
+    }
+
+    if (resp.endGame) {
+        return client_render(state->client, state->string,
+                             (const char *[1]){messages[1]}, 1);
+    }
+
+    return client_render(state->client, state->string,
+                         (const char *[1]){messages[4]}, 1);
 }
 
 int32_t
 init_render_string(struct RenderString *obj)
 {
-    obj->renderData = calloc(1024, 1);
-    obj->size = 1024;
+    obj->renderData = calloc(2048, 1);
+    obj->size = 2048;
     obj->length = 0;
 
     return 1;
@@ -162,8 +206,12 @@ client_render(struct Client *client, struct RenderString *rString,
     size_t totalBytesW = 0;
     char *outString = rString->renderData;
     struct GameField *field = client->gameSettings->field;
+    const char *const hudMsg = "Giocatore: %c  ------- Avversario: %c\n\n";
     const char *const padStr = "-----+";
     const size_t sizePadStr = strlen(padStr);
+
+    totalBytesW += snprintf(outString + totalBytesW, rString->size, hudMsg,
+                            client->symbol, client->opponentSymbol);
 
     totalBytesW +=
         snprintf(outString + totalBytesW, rString->size, "%*c", 5, 0x20);
@@ -241,31 +289,46 @@ client_loop(struct Client *client)
         .field = client->gameSettings->field,
     };
 
-    clear_terminal();
+    print_client(client);
+
+    char *errorBuffer = malloc(128);
+
     while (1) {
         struct Payload data = {};
-        int32_t mType = queue_recive(client->queueId, &data, -MSG_TURN_START);
+        int32_t mType = queue_recive(client->queueId, &data, -MSG_GAME_START);
 
-        clear_terminal();
+        LOG_INFO("Received %d", mType)
+
+        size_t bytes = 0;
+        _Bool needRender = false;
         switch (mType) {
         case MSG_ERROR:
-            process_error(&data, &gameState);
+            clear_terminal();
+            bytes = process_error(&data, &gameState, errorBuffer);
             break;
         case MSG_GAME_END:
-            process_game_end(&data, &gameState);
+            bytes = process_game_end(&data, &gameState);
             break;
         case MSG_GAME_START:
-            process_turn_start(&data, &gameState);
+            clear_terminal();
+            bytes = process_turn_start(&data, &gameState);
+            needRender = true;
             break;
         case MSG_TURN_START:
-            process_turn_start(&data, &gameState);
+            clear_terminal();
+            bytes = process_turn_start(&data, &gameState);
+            needRender = true;
             break;
         case MSG_SERVER_ACK:
-            process_turn_end(&data, &gameState);
+            clear_terminal();
+            bytes = process_turn_end(&data, &gameState);
+            needRender = true;
             break;
         }
-
-        client_render(client, gameState.string, NULL, 0);
+        if (needRender) {
+            clear_terminal();
+            write(STDOUT_FILENO, gameState.string->renderData, bytes);
+        }
     }
 }
 
@@ -291,7 +354,9 @@ int32_t
 parse_client_args(size_t argc, char const **argv, struct ClientArgs *args)
 {
     if (argc != 3) {
-        LOG_ERROR("Errore argomenti", "");
+        LOG_ERROR("Errore argomenti, utilizzo:\nF4Client {connectionQueue} "
+                  "{playerName}",
+                  "");
         return -1;
     }
 
@@ -318,9 +383,10 @@ print_client(struct Client *client)
     puts("----------------------------------------");
     printf("\tPid: %d\n\tPlayerName: %s"
            "\n\tQueueId: %d\n\tisBot: "
-           "%s\n\tDisconnectionSignal: %d\n",
+           "%s\n\tDisconnectionSignal: %d\n\tSymbol: %c\n\tOpponentSymbol: %c",
            client->pid, client->playerName, client->queueId,
-           get_bool_lab(client->isBot), client->signalDisconnection);
+           get_bool_lab(client->isBot), client->signalDisconnection,
+           client->symbol, client->opponentSymbol);
 
     puts("+--------------------------------------+\n");
     fflush(stdout);
