@@ -39,6 +39,7 @@ struct ConnectionManager {
     int32_t connShm;
     int32_t connQueueId;
     int32_t connServicePipe[2];
+    char symbols[2];
     _Bool inGame;
     _Bool isListneningForConnection;
 };

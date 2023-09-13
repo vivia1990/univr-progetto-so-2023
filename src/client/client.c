@@ -18,6 +18,7 @@
 struct State {
     struct Client *client;
     struct RenderString *string;
+    struct GameField *field;
     uint8_t columns;
 };
 
@@ -41,6 +42,8 @@ connect_to_server(struct ClientArgs *args, struct Client *client)
 
     client->queueId = resp.queueId;
     client->serverPid = resp.serverPid;
+    client->symbol = resp.symbol;
+    client->opponentSymbol = resp.opponentSymbol;
     client->signalDisconnection = resp.disconnectionSignal;
     client->gameSettings->field->columns = resp.fieldColumns;
     client->gameSettings->field->rows = resp.fieldRows;
@@ -114,8 +117,10 @@ process_turn_start(struct Payload *pl, struct State *state)
 {
     if (pl->mtype == MSG_TURN_START) {
         struct ServerGameResponse resp = {};
-        state->client->gameSettings->field->matrix[resp.row][resp.column] =
-            'X'; // todo other pl symbol
+        memcpy(&resp, pl->payload, sizeof resp);
+
+        state->field->matrix[resp.row][resp.column] =
+            state->client->opponentSymbol;
     }
     const char *const askMsg = "==> È il tuo turno\n\tScegli una colonna: ";
     ssize_t bytes = client_render(state->client, state->string,
@@ -233,6 +238,7 @@ client_loop(struct Client *client)
         .client = client,
         .string = &renderString,
         .columns = client->gameSettings->field->columns,
+        .field = client->gameSettings->field,
     };
 
     clear_terminal();

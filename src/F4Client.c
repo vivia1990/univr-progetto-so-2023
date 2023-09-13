@@ -21,10 +21,8 @@ main(int argc, char const *argv[])
     client->gameSettings = &settings;
 
     connect_to_server(&args, client);
-    game_init(client->gameSettings, settings.field->rows,
-              settings.field->columns);
-
-    print_game_field(client->gameSettings);
+    LOG_INFO("In attesa di altri giocatori", "")
+    client_loop(client);
 
     game_destruct(client->gameSettings);
 

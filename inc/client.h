@@ -15,6 +15,7 @@ struct Client {
     _Bool isBot;
     _Bool timeoutHappened;
     char symbol;
+    char opponentSymbol;
     char playerName[64];
     struct GameSettings *gameSettings;
 };

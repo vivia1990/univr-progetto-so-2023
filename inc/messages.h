@@ -27,6 +27,8 @@ struct ServerConnectionResponse {
     int32_t disconnectionSignal; // SIGUSR1 SIGUSR2
     int32_t fieldRows;
     int32_t fieldColumns;
+    char symbol;
+    char opponentSymbol;
     pid_t serverPid;
 };
 

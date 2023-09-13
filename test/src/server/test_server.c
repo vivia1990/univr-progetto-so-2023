@@ -69,7 +69,7 @@ test_server_loop()
     strcpy(req.playerName, "camper");
     req.typeResp = 1;
 
-    struct Client *client = create_client(&req);
+    struct Client *client = create_client(&req, 'X');
     write(server->connMng->connServicePipe[1], client, sizeof(struct Client));
     free(client);
 
@@ -77,7 +77,7 @@ test_server_loop()
     strcpy(req.playerName, "campisi");
     req.typeResp = 2;
 
-    client = create_client(&req);
+    client = create_client(&req, 'O');
     write(server->connMng->connServicePipe[1], client, sizeof(struct Client));
     free(client);
 
@@ -178,7 +178,7 @@ test_server_multiple_disconnection()
     strcpy(req.playerName, "camper");
     req.typeResp = 1;
 
-    struct Client *client = create_client(&req);
+    struct Client *client = create_client(&req, 'X');
     write(server->connMng->connServicePipe[1], client, sizeof(struct Client));
     free(client);
 
@@ -186,7 +186,7 @@ test_server_multiple_disconnection()
     strcpy(req.playerName, "campisi");
     req.typeResp = 2;
 
-    client = create_client(&req);
+    client = create_client(&req, 'O');
     write(server->connMng->connServicePipe[1], client, sizeof(struct Client));
     free(client);
 
@@ -263,7 +263,7 @@ test_server_disconnection()
     strcpy(req.playerName, "camper");
     req.typeResp = 1;
 
-    struct Client *client = create_client(&req);
+    struct Client *client = create_client(&req, 'X');
     write(server->connMng->connServicePipe[1], client, sizeof(struct Client));
     free(client);
 
@@ -271,7 +271,7 @@ test_server_disconnection()
     strcpy(req.playerName, "campisi");
     req.typeResp = 2;
 
-    client = create_client(&req);
+    client = create_client(&req, 'O');
     write(server->connMng->connServicePipe[1], client, sizeof(struct Client));
     free(client);
 
@@ -354,7 +354,7 @@ test_server_timeout()
     strcpy(req.playerName, "camper");
     req.typeResp = 1;
 
-    struct Client *client = create_client(&req);
+    struct Client *client = create_client(&req, 'X');
     write(server->connMng->connServicePipe[1], client, sizeof(struct Client));
     free(client);
 
@@ -362,7 +362,7 @@ test_server_timeout()
     strcpy(req.playerName, "campisi");
     req.typeResp = 2;
 
-    client = create_client(&req);
+    client = create_client(&req, 'O');
     write(server->connMng->connServicePipe[1], client, sizeof(struct Client));
     free(client);
 

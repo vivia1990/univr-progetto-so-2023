@@ -28,6 +28,8 @@ conn_loop(struct ConnectionManager *manager)
     const struct ErrorMsg gameStartedErr = {
         .errorCode = 503, .errorMsg = "Partita in corso, riprovare più tardi"};
 
+    struct Server *server = get_server();
+
     int32_t playerCounter = 0;
     while (1) {
         queue_recive_connection(servConnQId, &req, sizeof req, MSG_CONNECTION);
@@ -38,15 +40,21 @@ conn_loop(struct ConnectionManager *manager)
             continue;
         }
 
-        const struct Client *client = create_client(&req);
+        const struct Client *client =
+            create_client(&req, manager->symbols[playerCounter]);
         if (!client) {
             LOG_ERROR("Errore aggiunta client", "")
             continue;
         }
 
         resp.serverPid = getppid();
+        resp.symbol = client->symbol;
         resp.queueId = client->queueId;
         resp.disconnectionSignal = SIGUSR1 + 2 * playerCounter;
+        resp.fieldRows = server->gameSettings->field->rows;
+        resp.fieldColumns = server->gameSettings->field->columns;
+        resp.opponentSymbol = manager->symbols[(playerCounter + 1) % 2];
+
         queue_send_connection(servConnQId, &resp, sizeof resp, req.clientPid);
         LOG_INFO("Giocatore %s, PID: %d connesso, qId; %d", client->playerName,
                  client->pid, client->queueId);
@@ -64,7 +72,7 @@ conn_loop(struct ConnectionManager *manager)
 }
 
 int32_t
-conn_init_manager(struct Server *server)
+conn_init_manager(struct Server *server, struct ServerArgs *args)
 {
     int32_t shm = shmget(IPC_PRIVATE, sizeof(struct ConnectionManager), 0660);
     if (shm < 0) {
@@ -78,6 +86,7 @@ conn_init_manager(struct Server *server)
         return -1;
     }
     server->connMng = manager;
+    memcpy(server->connMng->symbols, args->symbols, sizeof(char) * 2);
 
     manager->connShm = shm;
     manager->inGame = false;
