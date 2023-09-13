@@ -64,6 +64,7 @@ conn_loop(struct ConnectionManager *manager)
 
         if (++playerCounter == 2) {
             playerCounter = 0;
+            manager->isListneningForConnection = false;
             conn_pause_listening(manager);
         }
     }

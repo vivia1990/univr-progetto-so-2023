@@ -51,7 +51,7 @@ struct Client {
     char symbol;
     _Bool winner;
     _Bool disconnected;
-    char playerName[64];
+    char playerName[63];
 };
 
 struct Server *get_server();
