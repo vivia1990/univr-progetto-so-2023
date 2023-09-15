@@ -223,9 +223,9 @@ test_server_multiple_disconnection()
     kill(child, SIGCONT);
 
     {
-        struct ServerGameResponse resp = {};
-        assert(queue_recive_game(state.firstPlayer->queueId, &resp, sizeof resp,
-                                 MSG_GAME_START) == MSG_GAME_START);
+        struct ErrorMsg error = {};
+        assert(queue_recive_game(state.firstPlayer->queueId, &error,
+                                 sizeof error, -MSG_GAME_START) == MSG_ERROR);
     }
 
     kill(child, SIGUSR1);
@@ -313,10 +313,10 @@ test_server_disconnection()
 
     kill(child, SIGUSR1);
     {
-        struct ServerGameResponse resp = {};
-        assert(queue_recive_game(state.secondPlayer->queueId, &resp,
-                                 sizeof resp, MSG_GAME_END) == MSG_GAME_END);
-        assert(resp.winner == true);
+        struct ErrorMsg error = {};
+        assert(queue_recive_game(state.secondPlayer->queueId, &error,
+                                 sizeof error, -MSG_GAME_START) == MSG_ERROR);
+        assert(error.errorCode == 601);
     }
 
     wait(NULL);
