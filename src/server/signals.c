@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 static void
 sig_int_handler()
@@ -13,9 +14,14 @@ sig_int_handler()
         server->wasCtrlCPressed = true;
     }
     else {
-        LOG_INFO("CTRL-C premuto ripetutamente, terminazione Server", "")
+        LOG_INFO("CTRL-C premuto ripetutamente, terminazione Server, notifica "
+                 "client",
+                 "")
+        for (size_t i = 0; i < server->playerCounter; i++) {
+            kill(server->players[i]->pid, SIGUSR1);
+        }
         down_server(server);
-        exit(EXIT_SUCCESS);
+        _exit(EXIT_SUCCESS);
     }
 }
 

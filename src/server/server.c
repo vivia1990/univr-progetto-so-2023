@@ -97,6 +97,8 @@ server_loop(struct Server *server)
                     MSG_GAME_START);
 
     while (1) {
+        server->wasCtrlCPressed = false;
+
         struct ClientGameRequest req = {};
         LOG_INFO("Server receiving", "")
         int32_t mtype = queue_recive_game(state.currentPlayer->queueId, &req,
@@ -122,8 +124,6 @@ server_loop(struct Server *server)
                 return -1;
             }
 
-            server->disconnectionHappened = false;
-            print_server(server);
             wait_queue_empty(&state, server);
 
             return -2;
