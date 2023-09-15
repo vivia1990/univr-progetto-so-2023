@@ -31,6 +31,9 @@ int32_t game_destruct(struct GameSettings *game);
 
 int32_t game_reset(struct GameSettings *game);
 
+void game_set_point_index(struct GameField *field, uint8_t row, uint8_t column,
+                          char symbol);
+
 void print_game_field(struct GameSettings *game);
 
 #endif

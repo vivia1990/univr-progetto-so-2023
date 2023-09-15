@@ -66,14 +66,9 @@ print_game_field(struct GameSettings *game)
     fflush(stdout);
 }
 
-int32_t
-game_set_point(struct GameField *field, size_t columnIndex, char symbol)
+void
+game_set_point_index(struct GameField *field, uint8_t row, uint8_t column,
+                     char symbol)
 {
-    return true;
-}
-
-_Bool
-game_check_win(struct GameField *field, char symbol)
-{
-    return false;
+    field->matrix[row][column] = symbol;
 }

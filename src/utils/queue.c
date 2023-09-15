@@ -86,3 +86,12 @@ queue_recive_error(int32_t qId, struct ErrorMsg *msg)
 
     return status;
 }
+
+_Bool
+queue_is_empty(int32_t qId)
+{
+    struct msqid_ds queue = {};
+    msgctl(qId, IPC_STAT, &queue);
+
+    return queue.msg_qnum == 0;
+}

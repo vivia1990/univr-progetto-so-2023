@@ -29,6 +29,14 @@ static int32_t process_turn_end(struct Payload *pl, struct State *state);
 
 extern int32_t queue_recive(int32_t qId, struct Payload *pl, int32_t mType);
 
+const char *const messages[] = {
+    "==> Congratulazioni, hai vinto!",
+    "==> Sconfitta :(",
+    "==> Gioco terminato, Pareggio\n",
+    "==> Mossa precedente non valida!\n\n",
+    "==> Attesa mossa altro giocatore...",
+};
+
 int32_t
 connect_to_server(struct ClientArgs *args, struct Client *client)
 {
@@ -80,7 +88,35 @@ process_error(struct Payload *pl, struct State *state, char *buffer)
 static int32_t
 process_game_end(struct Payload *pl, struct State *state)
 {
-    LOG_INFO("game end", "")
+    struct ServerGameResponse resp = {};
+    memcpy(&resp, pl->payload, sizeof resp);
+    game_set_point_index(state->field, resp.row, resp.column,
+                         state->client->opponentSymbol);
+    if (resp.winner) {
+        size_t bytes = client_render(state->client, state->string,
+                                     (const char *[1]){messages[0]}, 1);
+        // todo ask rematch
+
+        struct ClientGameRequest req = {.move = 0, .restartMatch = false};
+        queue_send_game(state->client->queueId, &resp, sizeof resp,
+                        MSG_CLIENT_MOVE); // todo nuovo tipo?
+
+        return bytes;
+    }
+
+    if (resp.draw) {
+        LOG_INFO("pareggio", "");
+        size_t bytes = client_render(state->client, state->string,
+                                     (const char *[1]){messages[2]}, 1);
+        write(STDOUT_FILENO, state->string->renderData, bytes);
+
+        return -4;
+    }
+
+    if (resp.endGame) {
+        return client_render(state->client, state->string,
+                             (const char *[1]){messages[1]}, 1);
+    }
     return 1;
 }
 
@@ -116,14 +152,6 @@ client_get_move(int32_t maxColumns, struct Client *client)
     return move;
 }
 
-const char *const messages[] = {
-    "==> Congratulazioni, hai vinto!",
-    "==> Sconfitta :(",
-    "==> Gioco terminato, Pareggio",
-    "==> Mossa precedente non valida!\n\n",
-    "==> Attesa mossa altro giocatore...",
-};
-
 static int32_t
 process_turn_start(struct Payload *pl, struct State *state)
 {
@@ -131,8 +159,8 @@ process_turn_start(struct Payload *pl, struct State *state)
         struct ServerGameResponse resp = {};
         memcpy(&resp, pl->payload, sizeof resp);
 
-        state->field->matrix[resp.row][resp.column] =
-            state->client->opponentSymbol;
+        game_set_point_index(state->field, resp.row, resp.column,
+                             state->client->opponentSymbol);
     }
     const char *const askMsg = "==> È il tuo turno\n\tScegli una colonna: ";
     ssize_t bytes = client_render(state->client, state->string,
@@ -162,28 +190,8 @@ process_turn_end(struct Payload *pl, struct State *state)
     struct ServerGameResponse resp = {};
     memcpy(&resp, pl->payload, sizeof resp);
 
-    state->field->matrix[resp.row][resp.column] = state->client->symbol;
-    if (resp.winner) {
-        size_t bytes = client_render(state->client, state->string,
-                                     (const char *[1]){messages[0]}, 1);
-        // todo ask rematch
-
-        struct ClientGameRequest req = {.move = 0, .restartMatch = false};
-        queue_send_game(state->client->queueId, &resp, sizeof resp,
-                        MSG_CLIENT_MOVE); // todo nuovo tipo?
-
-        return bytes;
-    }
-
-    if (resp.draw) {
-        return client_render(state->client, state->string,
-                             (const char *[1]){messages[2]}, 1);
-    }
-
-    if (resp.endGame) {
-        return client_render(state->client, state->string,
-                             (const char *[1]){messages[1]}, 1);
-    }
+    game_set_point_index(state->field, resp.row, resp.column,
+                         state->client->symbol);
 
     return client_render(state->client, state->string,
                          (const char *[1]){messages[4]}, 1);
@@ -325,6 +333,13 @@ client_loop(struct Client *client)
             needRender = true;
             break;
         }
+
+        if (bytes == -4) { // pareggio
+            free(gameState.string->renderData);
+            free(errorBuffer);
+            return bytes;
+        }
+
         if (needRender) {
             clear_terminal();
             write(STDOUT_FILENO, gameState.string->renderData, bytes);
