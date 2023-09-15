@@ -23,7 +23,8 @@ static void
 sig_usr_handler(int32_t signal)
 {
     struct Server *server = get_server();
-    const size_t sender = signal == SIGUSR2; // 0 or 1
+    const _Bool sender = signal == SIGUSR2; // 0 or 1
+    LOG_INFO("handler disconnection %d", signal)
     server->players[sender]->disconnected = true;
     ++server->disconnectionCounter;
     server->disconnectionHappened = true;

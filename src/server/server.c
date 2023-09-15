@@ -110,17 +110,12 @@ server_loop(struct Server *server)
                 LOG_INFO("giocatori disconnesi", "")
                 return -1;
             }
-
-            struct ServerGameResponse resp = {
-                .endGame = true,
-                .winner = true,
-                .draw = false,
-                .column = 0,
-                .row = 0,
-            };
             LOG_INFO("vittoria player: %s", client->playerName)
 
-            queue_send_game(client->queueId, &resp, sizeof resp, MSG_GAME_END);
+            struct ErrorMsg error = {.errorCode = 601,
+                                     .errorMsg =
+                                         "Giocatore avversario disconnesso"};
+            queue_send_error(client->queueId, &error);
 
             if (server->disconnectionCounter == 2) {
                 LOG_INFO("giocatori disconnesi", "")
@@ -129,6 +124,7 @@ server_loop(struct Server *server)
 
             server->disconnectionHappened = false;
             print_server(server);
+            wait_queue_empty(&state, server);
 
             return -2;
         }
