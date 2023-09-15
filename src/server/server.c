@@ -156,7 +156,7 @@ server_loop(struct Server *server)
             continue;
         }
 
-        int32_t rowIndex =
+        const int32_t rowIndex =
             game_set_point(gameField, req.move, state.currentPlayer->symbol);
         if (rowIndex < 0) {
 
@@ -167,22 +167,6 @@ server_loop(struct Server *server)
         }
 
         print_game_field(server->gameSettings);
-
-        if (++server->gameSettings->movesCounter == maxMoves) {
-            LOG_INFO("pareggio, mosse: %u", maxMoves)
-            print_game_field(server->gameSettings);
-            game_reset(server->gameSettings);
-
-            struct ServerGameResponse drawEnd = {0};
-            drawEnd.draw = true;
-            drawEnd.endGame = true;
-            queue_send_game(state.currentPlayer->queueId, &drawEnd,
-                            sizeof drawEnd, MSG_GAME_END);
-
-            queue_send_game(server->players[!state.currentPlayerIndex]->queueId,
-                            &drawEnd, sizeof drawEnd, MSG_GAME_END);
-            return -4;
-        }
 
         if (game_check_win(gameField, state.currentPlayer->symbol)) {
             // handle win
@@ -195,9 +179,35 @@ server_loop(struct Server *server)
             .column = req.move,
             .row = rowIndex,
         };
+
         // gioco continua, fine turno per il player
         queue_send_game(state.currentPlayer->queueId, &resp, sizeof resp,
                         MSG_SERVER_ACK); // @todo maybe turn_end?
+
+        if (++server->gameSettings->movesCounter == maxMoves) {
+            LOG_INFO("pareggio, mosse: %u", maxMoves)
+            print_game_field(server->gameSettings);
+            game_reset(server->gameSettings);
+
+            struct ServerGameResponse drawEnd = {0};
+            drawEnd.draw = true;
+            drawEnd.endGame = true;
+            drawEnd.column = req.move;
+            drawEnd.row = rowIndex;
+            const int32_t currQid = state.currentPlayer->queueId;
+            const int32_t otherQid =
+                server->players[!state.currentPlayerIndex]->queueId;
+            queue_send_game(currQid, &drawEnd, sizeof drawEnd, MSG_GAME_END);
+
+            queue_send_game(otherQid, &drawEnd, sizeof drawEnd, MSG_GAME_END);
+
+            while (queue_is_empty(currQid) == false ||
+                   queue_is_empty(otherQid) == false) {
+                sleep(1);
+            }
+
+            return -4;
+        }
 
         LOG_INFO("reset timeout player %s", state.currentPlayer->playerName)
         state.currentPlayer->timeoutCounter = 0;
