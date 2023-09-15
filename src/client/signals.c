@@ -16,7 +16,6 @@ sig_int_handler()
 static void
 sig_alarm_handler(int32_t signal)
 {
-    LOG_INFO("timeout happened", "")
     struct Client *client = get_client();
     client->timeoutHappened = true;
     stop_file_block(STDIN_FILENO);

@@ -29,12 +29,14 @@ static int32_t process_turn_end(struct Payload *pl, struct State *state);
 
 extern int32_t queue_recive(int32_t qId, struct Payload *pl, int32_t mType);
 
-const char *const messages[] = {
-    "==> Congratulazioni, hai vinto!",
-    "==> Sconfitta :(",
+const char *const labelMessages[] = {
+    "==> Congratulazioni, hai vinto!\n",
+    "==> Sconfitta :(\n",
     "==> Gioco terminato, Pareggio\n",
     "==> Mossa precedente non valida!\n\n",
-    "==> Attesa mossa altro giocatore...",
+    "==> Attesa mossa altro giocatore...\n",
+    "==> Ci hai messo troppo, turno perso\n",
+    "==> In attesa di altri giocatori\n",
 };
 
 int32_t
@@ -77,12 +79,35 @@ process_error(struct Payload *pl, struct State *state, char *buffer)
     size_t length = size + strlen(errorMsg.errorMsg);
     memcpy(buffer, msgPrefix, size);
     strcpy(buffer + size, errorMsg.errorMsg);
-    buffer[length++] = '\n';
-    buffer[length++] = '\n';
 
-    write(STDOUT_FILENO, buffer, length);
+    if (errorMsg.errorCode == 400) {
+        buffer[length++] = '\n';
+        buffer[length++] = '\n';
+        write(STDOUT_FILENO, buffer, length);
+        return process_turn_start(pl, state);
+    }
 
-    return process_turn_start(pl, state);
+    if (errorMsg.errorCode == 408) {
+        buffer[length++] = '\0';
+        clear_terminal();
+        size_t bytes = client_render(state->client, state->string,
+                                     (const char *[1]){buffer}, 1);
+        write(STDOUT_FILENO, state->string->renderData, bytes);
+        return bytes;
+    }
+
+    if (errorMsg.errorCode == 600) {
+        buffer[length++] = '\n';
+        buffer[length++] = '\0';
+        clear_terminal();
+        size_t bytes =
+            client_render(state->client, state->string,
+                          (const char *[2]){buffer, labelMessages[1]}, 2);
+        write(STDOUT_FILENO, state->string->renderData, bytes);
+        return -3;
+    }
+
+    assert(false == true);
 }
 
 static int32_t
@@ -90,24 +115,25 @@ process_game_end(struct Payload *pl, struct State *state)
 {
     struct ServerGameResponse resp = {};
     memcpy(&resp, pl->payload, sizeof resp);
-    game_set_point_index(state->field, resp.row, resp.column,
-                         state->client->opponentSymbol);
+    if (state->field->matrix[resp.row][resp.column] != state->client->symbol) {
+        game_set_point_index(state->field, resp.row, resp.column,
+                             state->client->opponentSymbol);
+    }
+
     if (resp.winner) {
         size_t bytes = client_render(state->client, state->string,
-                                     (const char *[1]){messages[0]}, 1);
+                                     (const char *[1]){labelMessages[0]}, 1);
         // todo ask rematch
 
-        struct ClientGameRequest req = {.move = 0, .restartMatch = false};
-        queue_send_game(state->client->queueId, &resp, sizeof resp,
-                        MSG_CLIENT_MOVE); // todo nuovo tipo?
-
+        write(STDOUT_FILENO, state->string->renderData, bytes);
+        exit(1);
         return bytes;
     }
 
     if (resp.draw) {
         LOG_INFO("pareggio", "");
         size_t bytes = client_render(state->client, state->string,
-                                     (const char *[1]){messages[2]}, 1);
+                                     (const char *[1]){labelMessages[2]}, 1);
         write(STDOUT_FILENO, state->string->renderData, bytes);
 
         return -4;
@@ -115,7 +141,7 @@ process_game_end(struct Payload *pl, struct State *state)
 
     if (resp.endGame) {
         return client_render(state->client, state->string,
-                             (const char *[1]){messages[1]}, 1);
+                             (const char *[1]){labelMessages[1]}, 1);
     }
     return 1;
 }
@@ -130,9 +156,8 @@ client_get_move(int32_t maxColumns, struct Client *client)
         errno = 0;
         read(STDIN_FILENO, number, 3);
         if (client->timeoutHappened) {
-            LOG_ERROR("Ci hai impiegato troppo tempo", "");
+            LOG_INFO("timeout happened", "");
             client->timeoutHappened = false;
-
             resume_file_block(STDIN_FILENO);
 
             return -2;
@@ -172,9 +197,13 @@ process_turn_start(struct Payload *pl, struct State *state)
         move = client_get_move(state->columns, state->client);
         if (move == -1) {
             clear_terminal();
-            write(STDOUT_FILENO, messages[3], strlen(messages[3]));
+            write(STDOUT_FILENO, labelMessages[3], strlen(labelMessages[3]));
             write(STDOUT_FILENO, state->string->renderData, bytes);
             continue;
+        }
+
+        if (move == -2) {
+            return 0;
         }
     }
 
@@ -194,7 +223,7 @@ process_turn_end(struct Payload *pl, struct State *state)
                          state->client->symbol);
 
     return client_render(state->client, state->string,
-                         (const char *[1]){messages[4]}, 1);
+                         (const char *[1]){labelMessages[4]}, 1);
 }
 
 int32_t
@@ -270,14 +299,12 @@ client_render(struct Client *client, struct RenderString *rString,
     if (nMessages) {
         outString[totalBytesW++] = '\n';
 
-        uint32_t totBytesMsg = 0;
         for (size_t i = 0; i < nMessages; i++) {
             const size_t size = strlen(messages[i]);
             memcpy(outString + totalBytesW, messages[i], size);
-            totBytesMsg += size;
+            totalBytesW += size;
+            outString[totalBytesW++] = '\n';
         }
-
-        totalBytesW += totBytesMsg;
     }
 
     rString->length += totalBytesW - rString->length;
@@ -297,9 +324,12 @@ client_loop(struct Client *client)
         .field = client->gameSettings->field,
     };
 
-    print_client(client);
-
     char *errorBuffer = malloc(128);
+
+    clear_terminal();
+    size_t bytes = client_render(gameState.client, gameState.string,
+                                 (const char *[1]){labelMessages[6]}, 1);
+    write(STDOUT_FILENO, gameState.string->renderData, bytes);
 
     while (1) {
         struct Payload data = {};
@@ -335,6 +365,12 @@ client_loop(struct Client *client)
         }
 
         if (bytes == -4) { // pareggio
+            free(gameState.string->renderData);
+            free(errorBuffer);
+            return bytes;
+        }
+
+        if (bytes == -3) { // sconfitta per timeout
             free(gameState.string->renderData);
             free(errorBuffer);
             return bytes;
