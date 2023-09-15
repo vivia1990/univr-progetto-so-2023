@@ -10,7 +10,8 @@ typedef struct GameSettings GameSettings;
 #include <stdbool.h>
 #include <stdint.h>
 
-#define SERVER_TIMEOUT_SECONDS 100
+#define SERVER_TIMEOUT_SECONDS 10
+// timeout massimi consecutivi
 #define MAX_TIMEOUT_MATCH 3
 
 struct ServerArgs {
