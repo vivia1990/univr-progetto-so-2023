@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define MSG_ERROR 50
-#define MSG_CONNECTION 100
+#define MSG_CONNECTION 600
 #define MSG_GAME_END 170
 #define MSG_SERVER_ACK 180
 #define MSG_CLIENT_MOVE 190
