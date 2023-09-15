@@ -45,6 +45,7 @@ connect_to_server(struct ClientArgs *args, struct Client *client)
     struct ClientConnectionRequest req = {.clientPid = getpid(),
                                           .typeResp = getpid()};
 
+    memcpy(req.playerName, args->playerName, strlen(args->playerName));
     if (queue_send_connection(args->connQueueId, &req, sizeof req,
                               MSG_CONNECTION) < 0) {
         LOG_ERROR("Errore inivio msg per connessione, qId: %d",
@@ -87,7 +88,7 @@ process_error(struct Payload *pl, struct State *state, char *buffer)
         return process_turn_start(pl, state);
     }
 
-    if (errorMsg.errorCode == 408) {
+    if (errorMsg.errorCode == 408) { // singolo timeout
         buffer[length++] = '\0';
         clear_terminal();
         size_t bytes = client_render(state->client, state->string,
@@ -96,7 +97,7 @@ process_error(struct Payload *pl, struct State *state, char *buffer)
         return bytes;
     }
 
-    if (errorMsg.errorCode == 600) {
+    if (errorMsg.errorCode == 600) { // timeout multipli
         buffer[length++] = '\n';
         buffer[length++] = '\0';
         clear_terminal();
@@ -105,6 +106,17 @@ process_error(struct Payload *pl, struct State *state, char *buffer)
                           (const char *[2]){buffer, labelMessages[1]}, 2);
         write(STDOUT_FILENO, state->string->renderData, bytes);
         return -3;
+    }
+
+    if (errorMsg.errorCode == 601) { // disconnessione altro player
+        buffer[length++] = '\n';
+        buffer[length++] = '\0';
+        clear_terminal();
+        size_t bytes =
+            client_render(state->client, state->string,
+                          (const char *[2]){buffer, labelMessages[0]}, 2);
+        write(STDOUT_FILENO, state->string->renderData, bytes);
+        return -5;
     }
 
     assert(false == true);
@@ -303,7 +315,9 @@ client_render(struct Client *client, struct RenderString *rString,
             const size_t size = strlen(messages[i]);
             memcpy(outString + totalBytesW, messages[i], size);
             totalBytesW += size;
-            outString[totalBytesW++] = '\n';
+            if (nMessages > 1) {
+                outString[totalBytesW++] = '\n';
+            }
         }
     }
 
@@ -337,7 +351,7 @@ client_loop(struct Client *client)
 
         LOG_INFO("Received %d", mType)
 
-        size_t bytes = 0;
+        int64_t bytes = 0;
         _Bool needRender = false;
         switch (mType) {
         case MSG_ERROR:
@@ -364,13 +378,7 @@ client_loop(struct Client *client)
             break;
         }
 
-        if (bytes == -4) { // pareggio
-            free(gameState.string->renderData);
-            free(errorBuffer);
-            return bytes;
-        }
-
-        if (bytes == -3) { // sconfitta per timeout
+        if (bytes < 0) { // pareggio
             free(gameState.string->renderData);
             free(errorBuffer);
             return bytes;
@@ -416,6 +424,13 @@ parse_client_args(size_t argc, char const **argv, struct ClientArgs *args)
     args->isBot = false; // todo
 
     return 1;
+}
+
+int32_t
+down_client(struct Client *client)
+{
+    game_destruct(client->gameSettings);
+    _exit(EXIT_SUCCESS);
 }
 
 static const char *

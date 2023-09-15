@@ -52,4 +52,6 @@ int32_t client_init_signals();
 
 int32_t client_get_move(int32_t maxColumns, struct Client *client);
 
+int32_t down_client(struct Client *client);
+
 void print_client(struct Client *client);

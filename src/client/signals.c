@@ -11,6 +11,8 @@ static void
 sig_int_handler()
 {
     struct Client *client = get_client();
+    kill(client->serverPid, client->signalDisconnection);
+    down_client(client);
 }
 
 static void
