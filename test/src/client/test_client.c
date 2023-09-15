@@ -95,7 +95,8 @@ test_client_render()
     field.matrix[field.rows - 1][6] = 'O';
 
     const char *const askMsg = "==> È il tuo turno\n==> Scegli una colonna: ";
-    bytetW = client_render(client, &rString, (const char *[1]){askMsg}, 1);
+    bytetW =
+        client_render(client, &rString, (const char *[2]){askMsg, askMsg}, 2);
     sleep(4);
     clear_terminal();
     printf("bt_written: %ld, strlen: %ld\n\n%s", bytetW,
@@ -158,8 +159,8 @@ test_client_get_move()
 int
 main(int argc, char const *argv[])
 {
-    // test_client_render();
-    test_client_get_move();
+    test_client_render();
+    // test_client_get_move();
     return EXIT_SUCCESS;
 }
 

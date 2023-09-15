@@ -431,7 +431,8 @@ test_server_timeout()
     {
         struct ErrorMsg resp = {};
         assert(queue_recive_game(state.firstPlayer->queueId, &resp, sizeof resp,
-                                 -MSG_SERVER_ACK) == MSG_GAME_END);
+                                 -MSG_SERVER_ACK) == MSG_ERROR);
+        assert(resp.errorCode == 600);
         LOG_INFO("Player1 Lost", "")
     }
 
