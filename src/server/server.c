@@ -63,26 +63,53 @@ get_connected_player(struct Server *server)
     return NULL;
 }
 
+static void
+wait_queue_empty(const struct GameState *state, struct Server *server)
+{
+    const int32_t currQid = state->currentPlayer->queueId;
+    const int32_t otherQid =
+        server->players[!state->currentPlayerIndex]->queueId;
+    size_t counter = 0;
+    while ((queue_is_empty(currQid) == false ||
+            queue_is_empty(otherQid) == false) &&
+           (counter++ < 10)) {
+        sleep(1);
+    }
+}
+
 int32_t
-server_loop(struct Server *server)
+server_loop(struct Server *server, int32_t firstPlayerIndex)
 {
     LOG_INFO("Server game loop started, pid: %d", getpid())
 
     struct GameField *gameField = server->gameSettings->field;
     const uint32_t maxMoves = gameField->rows * gameField->columns;
+    uint8_t *const *kernels[kernels_length] = {
+        [horizontal] = NULL,
+        [vertical] = NULL,
+        [diagonal_l] = NULL,
+        [diagonal_r] = NULL,
+    };
+
+    game_init_kernels(kernels);
 
     const struct GameState state = {};
 
     update_state(server, (struct GameState *)&state,
                  &(struct GameState){
-                     .currentPlayer = server->players[0],
-                     .currentPlayerIndex = 0,
+                     .currentPlayer = server->players[firstPlayerIndex],
+                     .currentPlayerIndex = firstPlayerIndex,
                  });
-    struct ServerGameResponse conn = {};
+    state.currentPlayer->timeoutCounter = 0;
+    server->players[!state.currentPlayerIndex]->timeoutCounter = 0;
+
+    struct ServerGameResponse conn = {.updateField = false};
     queue_send_game(state.currentPlayer->queueId, &conn, sizeof conn,
                     MSG_GAME_START);
-
+    _Bool atLeastOnePoint = false;
     while (1) {
+        server->wasCtrlCPressed = false;
+
         struct ClientGameRequest req = {};
         LOG_INFO("Server receiving", "")
         int32_t mtype = queue_recive_game(state.currentPlayer->queueId, &req,
@@ -96,25 +123,19 @@ server_loop(struct Server *server)
                 LOG_INFO("giocatori disconnesi", "")
                 return -1;
             }
-
-            struct ServerGameResponse resp = {
-                .endGame = true,
-                .winner = true,
-                .draw = false,
-                .column = 0,
-                .row = 0,
-            };
             LOG_INFO("vittoria player: %s", client->playerName)
 
-            queue_send_game(client->queueId, &resp, sizeof resp, MSG_GAME_END);
+            struct ErrorMsg error = {.errorCode = 601,
+                                     .errorMsg =
+                                         "Giocatore avversario disconnesso"};
+            queue_send_error(client->queueId, &error);
 
             if (server->disconnectionCounter == 2) {
                 LOG_INFO("giocatori disconnesi", "")
                 return -1;
             }
 
-            server->disconnectionHappened = false;
-            print_server(server);
+            wait_queue_empty(&state, server);
 
             return -2;
         }
@@ -122,19 +143,10 @@ server_loop(struct Server *server)
         if (server->timeoutHappened) {
             server->timeoutHappened = false;
             if (++state.currentPlayer->timeoutCounter > MAX_TIMEOUT_MATCH) {
+                struct ErrorMsg lost = {
+                    .errorCode = 600, .errorMsg = "Match perso per inattività"};
+                queue_send_error(state.currentPlayer->queueId, &lost);
 
-                struct ServerGameResponse resp = {
-                    .endGame = true,
-                    .winner = false,
-                    .draw = false,
-                    .column = 0,
-                    .row = 0,
-                };
-                // multiple timeouts
-                queue_send_game(state.currentPlayer->queueId, &resp,
-                                sizeof resp, MSG_GAME_END);
-
-                resp.winner = true;
                 update_state(
                     server, (struct GameState *)&state,
                     &(struct GameState){
@@ -143,21 +155,48 @@ server_loop(struct Server *server)
                         .currentPlayerIndex = !state.currentPlayerIndex,
                     });
 
-                queue_send_game(state.currentPlayer->queueId, &resp,
-                                sizeof resp, MSG_GAME_END);
+                struct ErrorMsg error = {.errorCode = 450};
+                if (atLeastOnePoint) {
+                    const char *const msg = "Vittoria per abbandono";
+                    memcpy(error.errorMsg, msg, strlen(msg));
+                }
+                else {
+                    const char *const msg = "Match terminato per inattività";
+                    memcpy(error.errorMsg, msg, strlen(msg));
+                }
+                queue_send_error(state.currentPlayer->queueId, &error);
 
-                game_reset(server->gameSettings);
+                kill(state.currentPlayer->pid, SIGALRM);
+                kill(server->players[!state.currentPlayerIndex]->pid, SIGALRM);
+                wait_queue_empty(&state, server);
 
                 return -3;
             }
             struct ErrorMsg error = {.errorCode = 408,
-                                     .errorMsg = "Timeout raggiunto"};
+                                     .errorMsg =
+                                         "Turno perso, ci hai messo troppo"};
+
+            kill(state.currentPlayer->pid, SIGALRM);
+
             queue_send_error(state.currentPlayer->queueId, &error);
+
+            update_state(
+                server, (struct GameState *)&state,
+                &(struct GameState){
+                    .currentPlayer = server->players[!state.currentPlayerIndex],
+                    .currentPlayerIndex = !state.currentPlayerIndex,
+                });
+
+            struct ServerGameResponse resp = {.updateField = false};
+            queue_send_game(state.currentPlayer->queueId, &resp, sizeof resp,
+                            MSG_GAME_START);
+
             continue;
         }
 
-        int32_t rowIndex =
+        const int32_t rowIndex =
             game_set_point(gameField, req.move, state.currentPlayer->symbol);
+        atLeastOnePoint = true;
         if (rowIndex < 0) {
 
             struct ErrorMsg error = {.errorCode = 400,
@@ -168,38 +207,98 @@ server_loop(struct Server *server)
 
         print_game_field(server->gameSettings);
 
-        if (++server->gameSettings->movesCounter == maxMoves) {
-            LOG_INFO("pareggio, mosse: %u", maxMoves)
-            print_game_field(server->gameSettings);
-            game_reset(server->gameSettings);
-
-            struct ServerGameResponse drawEnd = {0};
-            drawEnd.draw = true;
-            drawEnd.endGame = true;
-            queue_send_game(state.currentPlayer->queueId, &drawEnd,
-                            sizeof drawEnd, MSG_GAME_END);
-
-            queue_send_game(server->players[!state.currentPlayerIndex]->queueId,
-                            &drawEnd, sizeof drawEnd, MSG_GAME_END);
-            return -4;
-        }
-
-        if (game_check_win(gameField, state.currentPlayer->symbol)) {
-            // handle win
-        }
-
         struct ServerGameResponse resp = {
             .endGame = false,
             .draw = false,
             .winner = false,
             .column = req.move,
             .row = rowIndex,
+            .updateField = true,
         };
+
         // gioco continua, fine turno per il player
         queue_send_game(state.currentPlayer->queueId, &resp, sizeof resp,
                         MSG_SERVER_ACK); // @todo maybe turn_end?
 
-        LOG_INFO("reset timeout player %s", state.currentPlayer->playerName)
+        if (game_check_win(gameField, state.currentPlayer->symbol, kernels)) {
+            server->timeoutHappened = false;
+            struct ServerGameResponse resp = {
+                .endGame = true,
+                .winner = true,
+                .column = req.move,
+                .row = rowIndex,
+                .updateField = false,
+            };
+            queue_send_game(state.currentPlayer->queueId, &resp, sizeof resp,
+                            MSG_GAME_END);
+
+            resp.winner = false;
+            resp.updateField = true;
+            queue_send_game(server->players[!state.currentPlayerIndex]->queueId,
+                            &resp, sizeof resp, MSG_GAME_END);
+
+            struct ClientGameRequest req = {};
+            if (queue_recive_game(state.currentPlayer->queueId, &req,
+                                  sizeof req, MSG_CLIENT_MOVE) < 0) {
+                if (server->disconnectionHappened) {
+                    LOG_INFO("disconnesso game win", "");
+                    struct Client *player = get_connected_player(server);
+                    if (!player) {
+                        LOG_INFO("giocatori disconnessi", "")
+                        return -1;
+                    }
+
+                    struct ErrorMsg error = {
+                        .errorCode = 602,
+                        .errorMsg = "Giocatore avversario chiude qui"};
+                    queue_send_error(
+                        server->players[!state.currentPlayerIndex]->queueId,
+                        &error);
+
+                    wait_queue_empty(&state, server);
+
+                    return -1;
+                }
+            }
+
+            if (req.restartMatch) {
+                game_reset(server->gameSettings);
+                return state.currentPlayerIndex;
+            }
+
+            struct ErrorMsg error = {.errorCode = 602,
+                                     .errorMsg =
+                                         "Giocatore avversario chiude qui"};
+            queue_send_error(
+                server->players[!state.currentPlayerIndex]->queueId, &error);
+
+            wait_queue_empty(&state, server);
+            return -1;
+        }
+
+        if (++server->gameSettings->movesCounter == maxMoves) {
+            LOG_INFO("pareggio, mosse: %u", maxMoves)
+            print_game_field(server->gameSettings);
+
+            struct ServerGameResponse drawEnd = {0};
+            drawEnd.draw = true;
+            drawEnd.endGame = true;
+            drawEnd.column = req.move;
+            drawEnd.row = rowIndex;
+            const int32_t currQid = state.currentPlayer->queueId;
+            const int32_t otherQid =
+                server->players[!state.currentPlayerIndex]->queueId;
+            drawEnd.updateField = false;
+            queue_send_game(currQid, &drawEnd, sizeof drawEnd, MSG_GAME_END);
+
+            drawEnd.updateField = true; // ha già settatto il campo
+            queue_send_game(otherQid, &drawEnd, sizeof drawEnd, MSG_GAME_END);
+
+            wait_queue_empty(&state, server);
+
+            return -4;
+        }
+
         state.currentPlayer->timeoutCounter = 0;
         update_state(
             server, (struct GameState *)&state,

@@ -1,5 +1,5 @@
-CC =clang 
-CFLAGS =-Wall -g3 -I inc/ -fsanitize=address
+CC =gcc
+CFLAGS =-Wall -g3 -I inc/
 
 SERVER_PATH :=src/server
 SERVER_SOURCES := $(shell find $(SERVER_PATH)  -name "*.c")

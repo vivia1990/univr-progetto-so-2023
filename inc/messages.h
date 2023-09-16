@@ -5,9 +5,9 @@
 #include <stdint.h>
 
 #define MSG_ERROR 50
-#define MSG_CONNECTION 100
-#define MSG_GAME_END 170
-#define MSG_SERVER_ACK 180
+#define MSG_CONNECTION 600
+#define MSG_SERVER_ACK 170
+#define MSG_GAME_END 180
 #define MSG_CLIENT_MOVE 190
 #define MSG_TURN_START 200
 #define MSG_GAME_START 220
@@ -39,6 +39,7 @@ struct ServerGameResponse {
     _Bool winner;
     _Bool draw;
     _Bool endGame;
+    _Bool updateField; // updateGameField
 };
 
 // MSG_GAME MSG_GAME_START

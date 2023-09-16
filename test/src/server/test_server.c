@@ -88,7 +88,7 @@ test_server_loop()
         remove("./test/test_server.log");
         ssize_t fd = open("./test/test_server.log", O_CREAT | O_RDWR, 0660);
         dup2(fd, STDOUT_FILENO);
-        server_loop(server);
+        server_loop(server, 0);
         down_server(server);
         exit(EXIT_SUCCESS);
     }
@@ -106,6 +106,7 @@ test_server_loop()
         struct ServerGameResponse resp = {};
         assert(queue_recive_game(state.firstPlayer->queueId, &resp, sizeof resp,
                                  MSG_GAME_START) == MSG_GAME_START);
+        assert(resp.updateField == false);
     }
 
     {
@@ -119,6 +120,7 @@ test_server_loop()
         assert(queue_recive_game(state.firstPlayer->queueId, &resp, sizeof resp,
                                  MSG_SERVER_ACK) == MSG_SERVER_ACK);
         assert(resp.column == 4);
+        assert(resp.updateField == true);
     }
 
     // second player
@@ -127,6 +129,7 @@ test_server_loop()
         assert(queue_recive_game(state.secondPlayer->queueId, &resp,
                                  sizeof resp,
                                  MSG_TURN_START) == MSG_TURN_START);
+        assert(resp.updateField == true);
     }
 
     {
@@ -141,6 +144,7 @@ test_server_loop()
                                  sizeof resp,
                                  MSG_SERVER_ACK) == MSG_SERVER_ACK);
         assert(resp.column == 2);
+        assert(resp.updateField == true);
     }
 
     kill(child, SIGKILL);
@@ -204,7 +208,7 @@ test_server_multiple_disconnection()
         remove("./test/test_server.log");
         ssize_t fd = open("./test/test_server.log", O_CREAT | O_RDWR, 0660);
         dup2(fd, STDOUT_FILENO);
-        server_loop(server);
+        server_loop(server, 0);
         down_server(server);
         exit(EXIT_SUCCESS);
     }
@@ -222,13 +226,14 @@ test_server_multiple_disconnection()
     LOG_INFO("invio segnali", "")
     kill(child, SIGCONT);
 
-    {
-        struct ServerGameResponse resp = {};
-        assert(queue_recive_game(state.firstPlayer->queueId, &resp, sizeof resp,
-                                 MSG_GAME_START) == MSG_GAME_START);
-    }
-
     kill(child, SIGUSR1);
+    {
+        struct ErrorMsg error = {};
+        int32_t mtype = queue_recive_game(state.secondPlayer->queueId, &error,
+                                          sizeof error, -MSG_GAME_START);
+        LOG_INFO("%d", mtype);
+        assert(mtype == MSG_ERROR);
+    }
     kill(child, SIGUSR2);
 
     wait(NULL);
@@ -289,7 +294,7 @@ test_server_disconnection()
         remove("./test/test_server.log");
         ssize_t fd = open("./test/test_server.log", O_CREAT | O_RDWR, 0660);
         dup2(fd, STDOUT_FILENO);
-        server_loop(server);
+        server_loop(server, 0);
         exit(EXIT_SUCCESS);
     }
 
@@ -313,10 +318,10 @@ test_server_disconnection()
 
     kill(child, SIGUSR1);
     {
-        struct ServerGameResponse resp = {};
-        assert(queue_recive_game(state.secondPlayer->queueId, &resp,
-                                 sizeof resp, MSG_GAME_END) == MSG_GAME_END);
-        assert(resp.winner == true);
+        struct ErrorMsg error = {};
+        assert(queue_recive_game(state.secondPlayer->queueId, &error,
+                                 sizeof error, -MSG_GAME_START) == MSG_ERROR);
+        assert(error.errorCode == 601);
     }
 
     wait(NULL);
@@ -381,7 +386,7 @@ test_server_timeout()
         remove("./test/test_server.log");
         ssize_t fd = open("./test/test_server.log", O_CREAT | O_RDWR, 0660);
         dup2(fd, STDOUT_FILENO);
-        server_loop(server);
+        server_loop(server, 0);
         down_server(server);
         exit(EXIT_SUCCESS);
     }
@@ -431,7 +436,8 @@ test_server_timeout()
     {
         struct ErrorMsg resp = {};
         assert(queue_recive_game(state.firstPlayer->queueId, &resp, sizeof resp,
-                                 -MSG_SERVER_ACK) == MSG_GAME_END);
+                                 -MSG_SERVER_ACK) == MSG_ERROR);
+        assert(resp.errorCode == 600);
         LOG_INFO("Player1 Lost", "")
     }
 
@@ -451,7 +457,6 @@ main(int argc, char const *argv[])
     test_server_multiple_disconnection();
     test_server_disconnection();
     test_server_timeout();
-
     return EXIT_SUCCESS;
 }
 

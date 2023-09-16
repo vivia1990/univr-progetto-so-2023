@@ -44,7 +44,7 @@ test_game_draw()
     strcpy(req.playerName, "camper");
     req.typeResp = 1;
 
-    struct Client *client = create_client(&req);
+    struct Client *client = create_client(&req, 'X');
     write(server->connMng->connServicePipe[1], client, sizeof(struct Client));
     free(client);
 
@@ -52,7 +52,7 @@ test_game_draw()
     strcpy(req.playerName, "campisi");
     req.typeResp = 2;
 
-    client = create_client(&req);
+    client = create_client(&req, 'O');
     write(server->connMng->connServicePipe[1], client, sizeof(struct Client));
     free(client);
 
@@ -70,7 +70,7 @@ test_game_draw()
         remove("./test/test_server.log");
         ssize_t fd = open("./test/test_server.log", O_CREAT | O_RDWR, 0660);
         dup2(fd, STDOUT_FILENO);
-        server_loop(server);
+        server_loop(server, 0);
         game_destruct(server->gameSettings);
         exit(EXIT_SUCCESS);
     }

@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 static void
 sig_int_handler()
@@ -13,9 +14,14 @@ sig_int_handler()
         server->wasCtrlCPressed = true;
     }
     else {
-        LOG_INFO("CTRL-C premuto ripetutamente, terminazione Server", "")
+        LOG_INFO("CTRL-C premuto ripetutamente, terminazione Server, notifica "
+                 "client",
+                 "")
+        for (size_t i = 0; i < server->playerCounter; i++) {
+            kill(server->players[i]->pid, SIGUSR1);
+        }
         down_server(server);
-        exit(EXIT_SUCCESS);
+        _exit(EXIT_SUCCESS);
     }
 }
 
@@ -23,7 +29,8 @@ static void
 sig_usr_handler(int32_t signal)
 {
     struct Server *server = get_server();
-    const size_t sender = signal == SIGUSR2; // 0 or 1
+    const _Bool sender = signal == SIGUSR2; // 0 or 1
+    LOG_INFO("handler disconnection %d", signal)
     server->players[sender]->disconnected = true;
     ++server->disconnectionCounter;
     server->disconnectionHappened = true;

@@ -40,8 +40,8 @@ game_reset(struct GameSettings *game)
 {
     struct GameField *field = game->field;
 
-    uint8_t columns = field->columns;
-    uint8_t rows = field->rows;
+    uint32_t columns = field->columns;
+    uint32_t rows = field->rows;
     for (size_t i = 0; i < columns; i++) {
         field->rowsIndex[i] = rows;
     }
@@ -76,10 +76,10 @@ print_game_field(struct GameSettings *game)
 {
 
     LOG_INFO("Matrice di gioco\n", "")
-    const uint8_t offsetStart = 2;
+    const uint32_t offsetStart = 2;
 
     printf("%*c", offsetStart, 0x20);
-    for (uint8_t i = 0; i < game->field->columns; i++) {
+    for (uint32_t i = 0; i < game->field->columns; i++) {
         printf("%*d%*c", 3, i, -1, 0x20);
     }
     puts("\n");
@@ -113,8 +113,179 @@ game_set_point(struct GameField *field, size_t columnIndex, char symbol)
     return field->rowsIndex[columnIndex] = currentRow - 1;
 }
 
-_Bool
-game_check_win(struct GameField *field, char symbol)
+int32_t
+game_init_kernels(uint8_t *const *kernels[kernels_length])
 {
+    const uint32_t indexMap[kernels_length] = {
+        [horizontal] = horizontal,
+        [vertical] = vertical,
+        [diagonal_l] = diagonal_l,
+        [diagonal_r] = diagonal_r,
+    };
+
+    const uint32_t kernelsArr[kernels_length][2] = {
+        [horizontal] = {1, WIN_SEQUENCE_SIZE},
+        [vertical] = {WIN_SEQUENCE_SIZE, 1},
+        [diagonal_l] = {WIN_SEQUENCE_SIZE, WIN_SEQUENCE_SIZE},
+        [diagonal_r] = {WIN_SEQUENCE_SIZE, WIN_SEQUENCE_SIZE},
+    };
+
+    for (size_t kernIndex = 0; kernIndex < kernels_length; kernIndex++) {
+        uint8_t **kern = malloc(kernelsArr[kernIndex][0] * sizeof(uint8_t *));
+        for (size_t i = 0; i < kernelsArr[kernIndex][0]; i++) {
+            const size_t size = kernelsArr[kernIndex][1] * sizeof(uint8_t);
+            kern[i] = malloc(size);
+            memset(kern[i], 0x20, size);
+        }
+
+        for (size_t i = 0; i < kernelsArr[kernIndex][0]; i++) {
+            for (size_t j = 0; j < kernelsArr[kernIndex][1]; j++) {
+                printf("%c ", kern[i][j]);
+            }
+            printf("\n");
+        }
+
+        kernels[indexMap[kernIndex]] = kern;
+    }
+
+    return 1;
+}
+
+int32_t
+game_destruct_kernels(uint8_t **kernels[kernels_length])
+{
+    const uint32_t kernelsArr[kernels_length][2] = {
+        [horizontal] = {1, WIN_SEQUENCE_SIZE},
+        [vertical] = {WIN_SEQUENCE_SIZE, 1},
+        [diagonal_l] = {WIN_SEQUENCE_SIZE, WIN_SEQUENCE_SIZE},
+        [diagonal_r] = {WIN_SEQUENCE_SIZE, WIN_SEQUENCE_SIZE},
+    };
+
+    for (size_t i = 0; i < kernels_length; i++) {
+        for (size_t j = 0; j < kernelsArr[i][0]; j++) {
+            free(kernels[i][j]);
+        }
+
+        free(kernels[i]);
+    }
+
+    return 1;
+}
+
+static void
+init_horizontal(uint8_t horizontalKern[1][WIN_SEQUENCE_SIZE], uint8_t symbol)
+{
+    memset(horizontalKern[0], symbol, (sizeof symbol) * WIN_SEQUENCE_SIZE);
+}
+
+static void
+init_vertical(uint8_t vertical[WIN_SEQUENCE_SIZE][1], uint8_t symbol)
+{
+    for (size_t i = 0; i < WIN_SEQUENCE_SIZE; i++) {
+        vertical[i][0] = symbol;
+    }
+}
+
+static void
+init_diagonal_r(uint8_t diagonalKern[WIN_SEQUENCE_SIZE][WIN_SEQUENCE_SIZE],
+                uint8_t symbol)
+{
+    for (size_t i = 0; i < WIN_SEQUENCE_SIZE; i++) {
+        diagonalKern[i][i] = symbol;
+    }
+}
+
+static void
+init_diagonal_l(uint8_t diagonalKern[WIN_SEQUENCE_SIZE][WIN_SEQUENCE_SIZE],
+                uint8_t symbol)
+{
+    size_t counter = WIN_SEQUENCE_SIZE - 1;
+    for (size_t i = 0; i < WIN_SEQUENCE_SIZE; i++) {
+        diagonalKern[i][counter--] = symbol;
+    }
+}
+
+_Bool
+game_check_win(struct GameField *field, uint8_t player,
+               uint8_t *const *const kernels[kernels_length])
+{
+    uint8_t **board = field->matrix;
+    uint32_t rows = field->rows;
+    uint32_t cols = field->columns;
+
+    uint8_t horizontalKern[1][WIN_SEQUENCE_SIZE];
+    for (size_t i = 0; i < 1; i++) {
+        for (size_t j = 0; j < WIN_SEQUENCE_SIZE; j++) {
+            horizontalKern[i][j] = kernels[horizontal][i][j];
+        }
+    }
+    init_horizontal(horizontalKern, player);
+
+    uint8_t verticalKern[WIN_SEQUENCE_SIZE][1];
+    for (size_t i = 0; i < WIN_SEQUENCE_SIZE; i++) {
+        for (size_t j = 0; j < 1; j++) {
+            verticalKern[i][j] = kernels[vertical][i][j];
+        }
+    }
+    init_vertical(verticalKern, player);
+
+    uint8_t diagonalKernR[WIN_SEQUENCE_SIZE][WIN_SEQUENCE_SIZE];
+    for (size_t i = 0; i < WIN_SEQUENCE_SIZE; i++) {
+        for (size_t j = 0; j < WIN_SEQUENCE_SIZE; j++) {
+            diagonalKernR[i][j] = kernels[diagonal_r][i][j];
+        }
+    }
+    init_diagonal_r(diagonalKernR, player);
+
+    uint8_t diagonalKernL[WIN_SEQUENCE_SIZE][WIN_SEQUENCE_SIZE];
+    for (size_t i = 0; i < WIN_SEQUENCE_SIZE; i++) {
+        for (size_t j = 0; j < WIN_SEQUENCE_SIZE; j++) {
+            diagonalKernL[i][j] = kernels[diagonal_l][i][j];
+        }
+    }
+    init_diagonal_l(diagonalKernL, player);
+
+    for (uint32_t i = 0; i < rows; i++) {
+        for (uint32_t j = 0; j < cols; j++) {
+            if (j <= cols - WIN_SEQUENCE_SIZE) {
+                uint32_t sum = 0;
+                for (uint32_t k = 0; k < WIN_SEQUENCE_SIZE; k++) {
+                    if (board[i][j + k] == horizontalKern[0][k]) {
+                        sum++;
+                    }
+                }
+                if (sum == WIN_SEQUENCE_SIZE)
+                    return true;
+            }
+
+            if (i <= rows - WIN_SEQUENCE_SIZE) {
+                uint32_t sum = 0;
+                for (uint32_t k = 0; k < WIN_SEQUENCE_SIZE; k++) {
+                    if (board[i + k][j] == verticalKern[k][0]) {
+                        sum++;
+                    }
+                }
+                if (sum == WIN_SEQUENCE_SIZE)
+                    return true;
+            }
+
+            if (i <= rows - WIN_SEQUENCE_SIZE &&
+                j <= cols - WIN_SEQUENCE_SIZE) {
+                uint32_t sum1 = 0, sum2 = 0;
+                for (uint32_t k = 0; k < WIN_SEQUENCE_SIZE; k++) {
+                    if (board[i + k][j + k] == diagonalKernR[k][k]) {
+                        sum1++;
+                    }
+                    if (board[i + k][j + (WIN_SEQUENCE_SIZE - 1) - k] ==
+                        diagonalKernL[k][(WIN_SEQUENCE_SIZE - 1) - k]) {
+                        sum2++;
+                    }
+                }
+                if (sum1 == WIN_SEQUENCE_SIZE || sum2 == WIN_SEQUENCE_SIZE)
+                    return true;
+            }
+        }
+    }
+
     return false;
 }

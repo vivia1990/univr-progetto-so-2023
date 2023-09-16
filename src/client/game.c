@@ -28,10 +28,24 @@ game_init(struct GameSettings *game, size_t rows, size_t columns)
 }
 
 int32_t
+game_reset(struct GameSettings *game)
+{
+    struct GameField *field = game->field;
+
+    uint32_t columns = field->columns;
+    uint32_t rows = field->rows;
+    for (size_t i = 0; i < rows; i++) {
+        memset(field->matrix[i], 0x20, columns);
+    }
+
+    game->movesCounter = 0;
+
+    return 1;
+}
+
+int32_t
 game_destruct(struct GameSettings *game)
 {
-    LOG_INFO("Eliminazione Campo di gioco", "")
-
     struct GameField *field = game->field;
     for (size_t i = 0; i < field->rows; i++) {
         free(field->matrix[i]);
@@ -47,10 +61,10 @@ print_game_field(struct GameSettings *game)
 {
 
     LOG_INFO("Matrice di gioco\n", "")
-    const uint8_t offsetStart = 2;
+    const uint32_t offsetStart = 2;
 
     printf("%*c", offsetStart, 0x20);
-    for (uint8_t i = 0; i < game->field->columns; i++) {
+    for (uint32_t i = 0; i < game->field->columns; i++) {
         printf("%*d%*c", 3, i, -1, 0x20);
     }
     puts("\n");
@@ -66,14 +80,9 @@ print_game_field(struct GameSettings *game)
     fflush(stdout);
 }
 
-int32_t
-game_set_point(struct GameField *field, size_t columnIndex, char symbol)
+void
+game_set_point_index(struct GameField *field, uint32_t row, uint32_t column,
+                     char symbol)
 {
-    return true;
-}
-
-_Bool
-game_check_win(struct GameField *field, char symbol)
-{
-    return false;
+    field->matrix[row][column] = symbol;
 }
