@@ -106,6 +106,7 @@ test_server_loop()
         struct ServerGameResponse resp = {};
         assert(queue_recive_game(state.firstPlayer->queueId, &resp, sizeof resp,
                                  MSG_GAME_START) == MSG_GAME_START);
+        assert(resp.updateField == false);
     }
 
     {
@@ -119,6 +120,7 @@ test_server_loop()
         assert(queue_recive_game(state.firstPlayer->queueId, &resp, sizeof resp,
                                  MSG_SERVER_ACK) == MSG_SERVER_ACK);
         assert(resp.column == 4);
+        assert(resp.updateField == true);
     }
 
     // second player
@@ -127,6 +129,7 @@ test_server_loop()
         assert(queue_recive_game(state.secondPlayer->queueId, &resp,
                                  sizeof resp,
                                  MSG_TURN_START) == MSG_TURN_START);
+        assert(resp.updateField == true);
     }
 
     {
@@ -141,6 +144,7 @@ test_server_loop()
                                  sizeof resp,
                                  MSG_SERVER_ACK) == MSG_SERVER_ACK);
         assert(resp.column == 2);
+        assert(resp.updateField == true);
     }
 
     kill(child, SIGKILL);
@@ -222,13 +226,14 @@ test_server_multiple_disconnection()
     LOG_INFO("invio segnali", "")
     kill(child, SIGCONT);
 
+    kill(child, SIGUSR1);
     {
         struct ErrorMsg error = {};
-        assert(queue_recive_game(state.firstPlayer->queueId, &error,
-                                 sizeof error, -MSG_GAME_START) == MSG_ERROR);
+        int32_t mtype = queue_recive_game(state.secondPlayer->queueId, &error,
+                                          sizeof error, -MSG_GAME_START);
+        LOG_INFO("%d", mtype);
+        assert(mtype == MSG_ERROR);
     }
-
-    kill(child, SIGUSR1);
     kill(child, SIGUSR2);
 
     wait(NULL);
@@ -452,7 +457,6 @@ main(int argc, char const *argv[])
     test_server_multiple_disconnection();
     test_server_disconnection();
     test_server_timeout();
-
     return EXIT_SUCCESS;
 }
 
