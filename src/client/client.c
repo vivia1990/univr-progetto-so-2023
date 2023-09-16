@@ -64,10 +64,17 @@ connect_to_server(struct ClientArgs *args, struct Client *client)
               EXIT_FAILURE, args->connQueueId);
     }
 
-    struct ServerConnectionResponse resp = {};
-    queue_recive_connection(args->connQueueId, &resp, sizeof resp,
-                            req.clientPid);
+    struct Payload pl = {};
+    queue_recive(args->connQueueId, &pl, -client->pid);
+    if (pl.mtype == MSG_ERROR) {
+        struct ErrorMsg err = {};
+        memcpy(&err, pl.payload, sizeof err);
+        LOG_INFO("%s", err.errorMsg);
+        return -1;
+    }
 
+    struct ServerConnectionResponse resp = {};
+    memcpy(&resp, pl.payload, sizeof resp);
     client->queueId = resp.queueId;
     client->serverPid = resp.serverPid;
     client->symbol = resp.symbol;
