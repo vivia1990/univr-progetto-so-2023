@@ -28,10 +28,24 @@ game_init(struct GameSettings *game, size_t rows, size_t columns)
 }
 
 int32_t
+game_reset(struct GameSettings *game)
+{
+    struct GameField *field = game->field;
+
+    uint32_t columns = field->columns;
+    uint32_t rows = field->rows;
+    for (size_t i = 0; i < rows; i++) {
+        memset(field->matrix[i], 0x20, columns);
+    }
+
+    game->movesCounter = 0;
+
+    return 1;
+}
+
+int32_t
 game_destruct(struct GameSettings *game)
 {
-    LOG_INFO("Eliminazione Campo di gioco", "")
-
     struct GameField *field = game->field;
     for (size_t i = 0; i < field->rows; i++) {
         free(field->matrix[i]);
