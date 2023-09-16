@@ -62,9 +62,9 @@ main(int argc, char const *argv[])
         LOG_ERROR("Errore resume connection manager", "")
     }
 
-    LOG_INFO("waiting for players.., connectionManagerPid: "
-             "%d\nConnectionQueueId: %d",
-             server->connMng->connServicePid, server->connMng->connQueueId);
+    LOG_INFO("waiting for players..\n", "")
+    LOG_INFO("Connection Service disponibile su ==> %d\n",
+             server->connMng->connQueueId);
 
     add_clients(server, &args);
     LOG_INFO("player connected game starts in few seconds ", "");
@@ -82,8 +82,6 @@ main(int argc, char const *argv[])
             break;
         }
     }
-
-    // log players;
 
     print_server(server);
     print_game_field(server->gameSettings);
