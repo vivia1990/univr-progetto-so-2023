@@ -70,7 +70,7 @@ test_game_draw()
         remove("./test/test_server.log");
         ssize_t fd = open("./test/test_server.log", O_CREAT | O_RDWR, 0660);
         dup2(fd, STDOUT_FILENO);
-        server_loop(server);
+        server_loop(server, 0);
         game_destruct(server->gameSettings);
         exit(EXIT_SUCCESS);
     }

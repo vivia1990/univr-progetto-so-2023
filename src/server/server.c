@@ -241,7 +241,7 @@ server_loop(struct Server *server, int32_t firstPlayerIndex)
             if (queue_recive_game(state.currentPlayer->queueId, &req,
                                   sizeof req, MSG_CLIENT_MOVE) < 0) {
                 if (server->disconnectionHappened) {
-                    LOG_INFO("disconnesso game winn", "");
+                    LOG_INFO("disconnesso game win", "");
                     struct Client *player = get_connected_player(server);
                     if (!player) {
                         LOG_INFO("giocatori disconnessi", "")
@@ -299,7 +299,6 @@ server_loop(struct Server *server, int32_t firstPlayerIndex)
             return -4;
         }
 
-        LOG_INFO("reset timeout player %s", state.currentPlayer->playerName)
         state.currentPlayer->timeoutCounter = 0;
         update_state(
             server, (struct GameState *)&state,

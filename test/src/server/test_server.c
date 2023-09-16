@@ -88,7 +88,7 @@ test_server_loop()
         remove("./test/test_server.log");
         ssize_t fd = open("./test/test_server.log", O_CREAT | O_RDWR, 0660);
         dup2(fd, STDOUT_FILENO);
-        server_loop(server);
+        server_loop(server, 0);
         down_server(server);
         exit(EXIT_SUCCESS);
     }
@@ -208,7 +208,7 @@ test_server_multiple_disconnection()
         remove("./test/test_server.log");
         ssize_t fd = open("./test/test_server.log", O_CREAT | O_RDWR, 0660);
         dup2(fd, STDOUT_FILENO);
-        server_loop(server);
+        server_loop(server, 0);
         down_server(server);
         exit(EXIT_SUCCESS);
     }
@@ -294,7 +294,7 @@ test_server_disconnection()
         remove("./test/test_server.log");
         ssize_t fd = open("./test/test_server.log", O_CREAT | O_RDWR, 0660);
         dup2(fd, STDOUT_FILENO);
-        server_loop(server);
+        server_loop(server, 0);
         exit(EXIT_SUCCESS);
     }
 
@@ -386,7 +386,7 @@ test_server_timeout()
         remove("./test/test_server.log");
         ssize_t fd = open("./test/test_server.log", O_CREAT | O_RDWR, 0660);
         dup2(fd, STDOUT_FILENO);
-        server_loop(server);
+        server_loop(server, 0);
         down_server(server);
         exit(EXIT_SUCCESS);
     }
