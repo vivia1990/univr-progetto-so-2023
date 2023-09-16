@@ -84,6 +84,14 @@ server_loop(struct Server *server)
 
     struct GameField *gameField = server->gameSettings->field;
     const uint32_t maxMoves = gameField->rows * gameField->columns;
+    uint8_t *const *kernels[kernels_length] = {
+        [horizontal] = NULL,
+        [vertical] = NULL,
+        [diagonal_l] = NULL,
+        [diagonal_r] = NULL,
+    };
+
+    game_init_kernels(kernels);
 
     const struct GameState state = {};
 
@@ -196,8 +204,10 @@ server_loop(struct Server *server)
 
         print_game_field(server->gameSettings);
 
-        if (game_check_win(gameField, state.currentPlayer->symbol)) {
-            // handle win
+        if (game_check_win(gameField, state.currentPlayer->symbol, kernels)) {
+            LOG_INFO("win", "");
+            kill(server->pid, SIGINT);
+            kill(server->pid, SIGINT);
         }
 
         struct ServerGameResponse resp = {
