@@ -127,7 +127,7 @@ process_game_end(struct Payload *pl, struct State *state)
 {
     struct ServerGameResponse resp = {};
     memcpy(&resp, pl->payload, sizeof resp);
-    if (state->field->matrix[resp.row][resp.column] != state->client->symbol) {
+    if (resp.updateField) {
         game_set_point_index(state->field, resp.row, resp.column,
                              state->client->opponentSymbol);
     }

@@ -92,7 +92,7 @@ server_loop(struct Server *server)
                      .currentPlayer = server->players[0],
                      .currentPlayerIndex = 0,
                  });
-    struct ServerGameResponse conn = {};
+    struct ServerGameResponse conn = {.updateField = false};
     queue_send_game(state.currentPlayer->queueId, &conn, sizeof conn,
                     MSG_GAME_START);
 
@@ -142,6 +142,7 @@ server_loop(struct Server *server)
                     .draw = false,
                     .column = 0,
                     .row = 0,
+                    .updateField = false,
                 };
                 update_state(
                     server, (struct GameState *)&state,
@@ -176,7 +177,7 @@ server_loop(struct Server *server)
                     .currentPlayerIndex = !state.currentPlayerIndex,
                 });
 
-            struct ServerGameResponse resp = {};
+            struct ServerGameResponse resp = {.updateField = false};
             queue_send_game(state.currentPlayer->queueId, &resp, sizeof resp,
                             MSG_GAME_START);
 
@@ -205,6 +206,7 @@ server_loop(struct Server *server)
             .winner = false,
             .column = req.move,
             .row = rowIndex,
+            .updateField = true,
         };
 
         // gioco continua, fine turno per il player
@@ -223,8 +225,10 @@ server_loop(struct Server *server)
             const int32_t currQid = state.currentPlayer->queueId;
             const int32_t otherQid =
                 server->players[!state.currentPlayerIndex]->queueId;
+            drawEnd.updateField = false;
             queue_send_game(currQid, &drawEnd, sizeof drawEnd, MSG_GAME_END);
 
+            drawEnd.updateField = true; // ha già settatto il campo
             queue_send_game(otherQid, &drawEnd, sizeof drawEnd, MSG_GAME_END);
 
             wait_queue_empty(&state, server);
