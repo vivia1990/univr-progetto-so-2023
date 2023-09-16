@@ -78,7 +78,7 @@ wait_queue_empty(const struct GameState *state, struct Server *server)
 }
 
 int32_t
-server_loop(struct Server *server)
+server_loop(struct Server *server, int32_t firstPlayerIndex)
 {
     LOG_INFO("Server game loop started, pid: %d", getpid())
 
@@ -97,8 +97,8 @@ server_loop(struct Server *server)
 
     update_state(server, (struct GameState *)&state,
                  &(struct GameState){
-                     .currentPlayer = server->players[0],
-                     .currentPlayerIndex = 0,
+                     .currentPlayer = server->players[firstPlayerIndex],
+                     .currentPlayerIndex = firstPlayerIndex,
                  });
     state.currentPlayer->timeoutCounter = 0;
     server->players[!state.currentPlayerIndex]->timeoutCounter = 0;
@@ -147,14 +147,6 @@ server_loop(struct Server *server)
                     .errorCode = 600, .errorMsg = "Match perso per inattività"};
                 queue_send_error(state.currentPlayer->queueId, &lost);
 
-                struct ServerGameResponse resp = {
-                    .endGame = true,
-                    .winner = true,
-                    .draw = false,
-                    .column = 0,
-                    .row = 0,
-                    .updateField = false,
-                };
                 update_state(
                     server, (struct GameState *)&state,
                     &(struct GameState){
@@ -227,8 +219,8 @@ server_loop(struct Server *server)
         // gioco continua, fine turno per il player
         queue_send_game(state.currentPlayer->queueId, &resp, sizeof resp,
                         MSG_SERVER_ACK); // @todo maybe turn_end?
-        // game_check_win(gameField, state.currentPlayer->symbol, kernels)
-        if (false) {
+
+        if (game_check_win(gameField, state.currentPlayer->symbol, kernels)) {
             server->timeoutHappened = false;
             struct ServerGameResponse resp = {
                 .endGame = true,
@@ -271,7 +263,7 @@ server_loop(struct Server *server)
 
             if (req.restartMatch) {
                 game_reset(server->gameSettings);
-                return -5;
+                return state.currentPlayerIndex;
             }
 
             struct ErrorMsg error = {.errorCode = 602,
