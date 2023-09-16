@@ -10,12 +10,45 @@
 #include <string.h>
 #include <unistd.h>
 
+int32_t
+server_parse_args(int argc, const char *argv[], struct ServerArgs *args)
+{
+    if (argc != 5) {
+        printf("Utilizzo: %s <righe> <colonne> <player1> <player2>\n", argv[0]);
+        return -1;
+    }
+
+    args->rows = atoi(argv[1]);
+    args->columns = atoi(argv[2]);
+
+    if (args->rows < 4 || args->columns < 4) {
+        printf("Il campo da gioco deve essere almeno 4x4\n");
+        return -1;
+    }
+
+    if (strlen(argv[3]) != 1 || strlen(argv[4]) != 1) {
+        printf("Simboli devono essere caratteri ascii\n");
+        return -1;
+    }
+
+    if (argv[3][0] > 127 || argv[4][0] > 127) {
+        printf("Simboli devono essere caratteri ascii\n");
+        return -1;
+    }
+
+    args->symbols[0] = argv[3][0];
+    args->symbols[1] = argv[4][0];
+
+    return 0;
+}
+
 int
 main(int argc, char const *argv[])
 {
-    struct ServerArgs args = {.columns = 3, .rows = 3};
-    args.symbols[0] = 'O';
-    args.symbols[1] = 'X';
+    struct ServerArgs args = {};
+    if (server_parse_args(argc, argv, &args) < 0) {
+        return EXIT_FAILURE;
+    }
 
     struct GameField gf = {0};
     struct GameSettings game = {.field = &gf};
@@ -38,7 +71,17 @@ main(int argc, char const *argv[])
     server->connMng->inGame = true;
     conn_resume_listening(server->connMng);
 
-    server_loop(server);
+    uint32_t firstPlayer = 0;
+    while (1) {
+        const int32_t status = server_loop(server, firstPlayer);
+
+        if (status == 0 || status == 1) {
+            firstPlayer = !status;
+        }
+        else {
+            break;
+        }
+    }
 
     // log players;
 

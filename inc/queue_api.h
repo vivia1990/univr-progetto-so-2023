@@ -65,4 +65,6 @@ int32_t queue_recive_error(int32_t qId, struct ErrorMsg *msg);
 
 _Bool queue_is_empty(int32_t qId);
 
+int32_t queue_exists(int32_t qId);
+
 #endif

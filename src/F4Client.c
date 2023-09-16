@@ -4,13 +4,37 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+int32_t
+client_parse_args(int argc, char *argv[], struct ClientArgs *args)
+{
+    if (argc != 3) {
+        printf("Utilizzo: %s <Server connection Queue> <playerName>\n",
+               argv[0]);
+        return -1;
+    }
+
+    args->connQueueId = atoi(argv[1]);
+
+    if (strlen(argv[3]) > 64) {
+        printf("Il nome del giocatore deve essere di 64 caratteri massimo\n");
+        return -1;
+    }
+
+    args->playerName = argv[3];
+
+    return 0;
+}
 
 int
 main(int argc, char const *argv[])
 {
 
     struct ClientArgs args = {};
-    parse_client_args(argc, argv, &args);
+    if (parse_client_args(argc, argv, &args) < 0) {
+        return EXIT_FAILURE;
+    }
 
     struct Client *client = get_client();
     init_client(client, &args);
@@ -20,10 +44,13 @@ main(int argc, char const *argv[])
     settings.field = &field;
     client->gameSettings = &settings;
 
-    connect_to_server(&args, client);
+    if (connect_to_server(&args, client) < 0) {
+        LOG_INFO("Errore connessione server", "");
+        return EXIT_FAILURE;
+    }
     game_init(client->gameSettings, client->gameSettings->field->rows,
               client->gameSettings->field->columns);
-    LOG_INFO("In attesa di altri giocatori", "")
+
     client_loop(client);
 
     game_destruct(client->gameSettings);

@@ -41,7 +41,7 @@ const char *const labelMessages[] = {
     "==> In attesa di altri giocatori\n",
     "==> In attesa della decisione dell'altro giocatore\n",
     "==> Vuoi ricominciare la partita? (Yes/No) ",
-    "==> Match Restart\n",
+    "==> Match Restarting...\n",
 };
 
 int32_t
@@ -51,10 +51,17 @@ connect_to_server(struct ClientArgs *args, struct Client *client)
                                           .typeResp = getpid()};
 
     memcpy(req.playerName, args->playerName, strlen(args->playerName));
+
+    if (!queue_exists(args->connQueueId)) {
+        LOG_INFO("Message queue inesistente! %d", args->connQueueId);
+        return -1;
+    }
+
     if (queue_send_connection(args->connQueueId, &req, sizeof req,
                               MSG_CONNECTION) < 0) {
-        LOG_ERROR("Errore inivio msg per connessione, qId: %d",
-                  args->connQueueId)
+        PANIC("Server non raggiungibile o numero message queue non "
+              "corretto, qId: %d",
+              EXIT_FAILURE, args->connQueueId);
     }
 
     struct ServerConnectionResponse resp = {};
@@ -174,13 +181,9 @@ process_game_end(struct Payload *pl, struct State *state)
     }
 
     if (resp.winner) {
-        size_t bytes =
-            client_render(state->client, state->string,
-                          (const char *[2]){labelMessages[0], labelMessages[8]},
-                          resp.updateField ? 2 : 1);
-        if (!resp.updateField) {
-            return -1;
-        }
+        size_t bytes = client_render(
+            state->client, state->string,
+            (const char *[2]){labelMessages[0], labelMessages[8]}, 2);
 
         // todo ask rematch
         clear_terminal();
@@ -189,10 +192,13 @@ process_game_end(struct Payload *pl, struct State *state)
 
         if (client_confirm_restart(state->client)) {
             req.restartMatch = true;
-            clear_terminal();
-            write(STDOUT_FILENO, labelMessages[9], strlen(labelMessages[9]));
             queue_send_game(state->client->queueId, &req, sizeof req,
                             MSG_CLIENT_MOVE);
+            clear_terminal();
+            size_t bytes =
+                client_render(state->client, state->string,
+                              (const char *[1]){labelMessages[9]}, 1);
+            write(STDOUT_FILENO, state->string->renderData, bytes);
 
             return -6;
         }

@@ -83,3 +83,10 @@ queue_is_empty(int32_t qId)
 
     return queue.msg_qnum == 0;
 }
+
+int32_t
+queue_exists(int32_t qId)
+{
+    struct msqid_ds queue = {};
+    return msgctl(qId, IPC_STAT, &queue) >= 0;
+}
