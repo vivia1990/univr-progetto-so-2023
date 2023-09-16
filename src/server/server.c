@@ -100,10 +100,13 @@ server_loop(struct Server *server)
                      .currentPlayer = server->players[0],
                      .currentPlayerIndex = 0,
                  });
+    state.currentPlayer->timeoutCounter = 0;
+    server->players[!state.currentPlayerIndex]->timeoutCounter = 0;
+
     struct ServerGameResponse conn = {.updateField = false};
     queue_send_game(state.currentPlayer->queueId, &conn, sizeof conn,
                     MSG_GAME_START);
-
+    _Bool atLeastOnePoint = false;
     while (1) {
         server->wasCtrlCPressed = false;
 
@@ -160,13 +163,20 @@ server_loop(struct Server *server)
                         .currentPlayerIndex = !state.currentPlayerIndex,
                     });
 
-                queue_send_game(state.currentPlayer->queueId, &resp,
-                                sizeof resp, MSG_GAME_END);
+                struct ErrorMsg error = {.errorCode = 450};
+                if (atLeastOnePoint) {
+                    const char *const msg = "Vittoria per abbandono";
+                    memcpy(error.errorMsg, msg, strlen(msg));
+                }
+                else {
+                    const char *const msg = "Match terminato per inattività";
+                    memcpy(error.errorMsg, msg, strlen(msg));
+                }
+                queue_send_error(state.currentPlayer->queueId, &error);
+
                 kill(state.currentPlayer->pid, SIGALRM);
                 kill(server->players[!state.currentPlayerIndex]->pid, SIGALRM);
                 wait_queue_empty(&state, server);
-
-                game_reset(server->gameSettings);
 
                 return -3;
             }
@@ -194,6 +204,7 @@ server_loop(struct Server *server)
 
         const int32_t rowIndex =
             game_set_point(gameField, req.move, state.currentPlayer->symbol);
+        atLeastOnePoint = true;
         if (rowIndex < 0) {
 
             struct ErrorMsg error = {.errorCode = 400,
@@ -203,12 +214,6 @@ server_loop(struct Server *server)
         }
 
         print_game_field(server->gameSettings);
-
-        if (game_check_win(gameField, state.currentPlayer->symbol, kernels)) {
-            LOG_INFO("win", "");
-            kill(server->pid, SIGINT);
-            kill(server->pid, SIGINT);
-        }
 
         struct ServerGameResponse resp = {
             .endGame = false,
@@ -222,6 +227,62 @@ server_loop(struct Server *server)
         // gioco continua, fine turno per il player
         queue_send_game(state.currentPlayer->queueId, &resp, sizeof resp,
                         MSG_SERVER_ACK); // @todo maybe turn_end?
+        // game_check_win(gameField, state.currentPlayer->symbol, kernels)
+        if (false) {
+            server->timeoutHappened = false;
+            struct ServerGameResponse resp = {
+                .endGame = true,
+                .winner = true,
+                .column = req.move,
+                .row = rowIndex,
+                .updateField = false,
+            };
+            queue_send_game(state.currentPlayer->queueId, &resp, sizeof resp,
+                            MSG_GAME_END);
+
+            resp.winner = false;
+            resp.updateField = true;
+            queue_send_game(server->players[!state.currentPlayerIndex]->queueId,
+                            &resp, sizeof resp, MSG_GAME_END);
+
+            struct ClientGameRequest req = {};
+            if (queue_recive_game(state.currentPlayer->queueId, &req,
+                                  sizeof req, MSG_CLIENT_MOVE) < 0) {
+                if (server->disconnectionHappened) {
+                    LOG_INFO("disconnesso game winn", "");
+                    struct Client *player = get_connected_player(server);
+                    if (!player) {
+                        LOG_INFO("giocatori disconnessi", "")
+                        return -1;
+                    }
+
+                    struct ErrorMsg error = {
+                        .errorCode = 602,
+                        .errorMsg = "Giocatore avversario chiude qui"};
+                    queue_send_error(
+                        server->players[!state.currentPlayerIndex]->queueId,
+                        &error);
+
+                    wait_queue_empty(&state, server);
+
+                    return -1;
+                }
+            }
+
+            if (req.restartMatch) {
+                game_reset(server->gameSettings);
+                return -5;
+            }
+
+            struct ErrorMsg error = {.errorCode = 602,
+                                     .errorMsg =
+                                         "Giocatore avversario chiude qui"};
+            queue_send_error(
+                server->players[!state.currentPlayerIndex]->queueId, &error);
+
+            wait_queue_empty(&state, server);
+            return -1;
+        }
 
         if (++server->gameSettings->movesCounter == maxMoves) {
             LOG_INFO("pareggio, mosse: %u", maxMoves)

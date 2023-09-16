@@ -11,7 +11,7 @@
 #define PANIC(msg, status, args...)                                            \
     do {                                                                       \
         LOG_ERROR(msg, args);                                                  \
-        exit(status);                                                          \
+        _exit(status);                                                         \
     } while (0);
 
 char *int_to_string(int32_t value, char *buff, size_t length);

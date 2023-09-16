@@ -1,29 +1,17 @@
 #include "log.h"
 #include "messages.h"
 #include "queue_api.h"
+#include "utils.h"
 #include <errno.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/msg.h>
+#include <unistd.h>
 
 extern int32_t queue_recive(int32_t qId, struct Payload *pl, int32_t mType);
 
-static int32_t
-queue_send(int32_t qId, const struct Payload *pl)
-{
-    ssize_t status = 0;
-    do {
-        errno = 0;
-        status = msgsnd(qId, pl, MSG_SIZE(Payload), IPC_NOWAIT);
-    } while (errno == EINTR);
-
-    if (status < 0) {
-        LOG_ERROR("Errore invio payload queue_api", "");
-        return status;
-    }
-
-    return pl->mtype;
-}
+extern int32_t queue_send(int32_t qId, const struct Payload *pl);
 
 int32_t
 queue_send_game(int32_t qId, const void *msg, size_t msgSize,
