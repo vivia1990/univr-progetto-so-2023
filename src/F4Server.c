@@ -13,7 +13,7 @@
 int
 main(int argc, char const *argv[])
 {
-    struct ServerArgs args = {.columns = 7, .rows = 5};
+    struct ServerArgs args = {.columns = 3, .rows = 3};
     args.symbols[0] = 'O';
     args.symbols[1] = 'X';
 

@@ -19,7 +19,7 @@ struct State {
     struct Client *client;
     struct RenderString *string;
     struct GameField *field;
-    uint8_t columns;
+    uint32_t columns;
 };
 static int32_t process_error(struct Payload *pl, struct State *state,
                              char *buffer);
@@ -265,7 +265,7 @@ client_render(struct Client *client, struct RenderString *rString,
     totalBytesW +=
         snprintf(outString + totalBytesW, rString->size, "%*c", 5, 0x20);
 
-    for (uint8_t i = 0; i < field->columns; i++) {
+    for (uint32_t i = 0; i < field->columns; i++) {
         totalBytesW += snprintf(outString + totalBytesW, rString->size,
                                 "%*d%*c", 4, i + 1, 2, 0x20);
     }

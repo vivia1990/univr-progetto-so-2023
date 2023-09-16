@@ -40,8 +40,8 @@ game_reset(struct GameSettings *game)
 {
     struct GameField *field = game->field;
 
-    uint8_t columns = field->columns;
-    uint8_t rows = field->rows;
+    uint32_t columns = field->columns;
+    uint32_t rows = field->rows;
     for (size_t i = 0; i < columns; i++) {
         field->rowsIndex[i] = rows;
     }
@@ -76,10 +76,10 @@ print_game_field(struct GameSettings *game)
 {
 
     LOG_INFO("Matrice di gioco\n", "")
-    const uint8_t offsetStart = 2;
+    const uint32_t offsetStart = 2;
 
     printf("%*c", offsetStart, 0x20);
-    for (uint8_t i = 0; i < game->field->columns; i++) {
+    for (uint32_t i = 0; i < game->field->columns; i++) {
         printf("%*d%*c", 3, i, -1, 0x20);
     }
     puts("\n");

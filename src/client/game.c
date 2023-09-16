@@ -47,10 +47,10 @@ print_game_field(struct GameSettings *game)
 {
 
     LOG_INFO("Matrice di gioco\n", "")
-    const uint8_t offsetStart = 2;
+    const uint32_t offsetStart = 2;
 
     printf("%*c", offsetStart, 0x20);
-    for (uint8_t i = 0; i < game->field->columns; i++) {
+    for (uint32_t i = 0; i < game->field->columns; i++) {
         printf("%*d%*c", 3, i, -1, 0x20);
     }
     puts("\n");
@@ -67,7 +67,7 @@ print_game_field(struct GameSettings *game)
 }
 
 void
-game_set_point_index(struct GameField *field, uint8_t row, uint8_t column,
+game_set_point_index(struct GameField *field, uint32_t row, uint32_t column,
                      char symbol)
 {
     field->matrix[row][column] = symbol;

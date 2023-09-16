@@ -11,8 +11,8 @@ struct GameSettings {
 };
 
 struct GameField {
-    uint8_t rows;
-    uint8_t columns;
+    uint32_t rows;
+    uint32_t columns;
     uint8_t **matrix;
     uint32_t
         *rowsIndex; // array con indice riga corrente occupata della colonna
@@ -31,8 +31,8 @@ int32_t game_destruct(struct GameSettings *game);
 
 int32_t game_reset(struct GameSettings *game);
 
-void game_set_point_index(struct GameField *field, uint8_t row, uint8_t column,
-                          char symbol);
+void game_set_point_index(struct GameField *field, uint32_t row,
+                          uint32_t column, char symbol);
 
 void print_game_field(struct GameSettings *game);
 
